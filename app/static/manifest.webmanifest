@@ -1,0 +1,10 @@
+{
+  "name": "TrimTime Barber Queue",
+  "short_name": "TrimTime",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f0e7",
+  "theme_color": "#17231c",
+  "description": "Join your barber's live queue without waiting in the shop."
+}
+

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><link rel="stylesheet" href="/static/styles.css?v=24" /><title>TrimTime · Platform admin</title></head>
+<body>
+  <header class="topbar"><a class="brand" href="/">TRIM<span>TIME</span></a><a href="/staff">Shop dashboard</a></header>
+  <main class="staff-main">
+    <section class="hero compact"><p class="eyebrow">PLATFORM ADMIN</p><h1>Grow the shop network.</h1><p class="muted">Create shops, owners and unique QR codes.</p></section>
+    <section id="admin-login" class="panel"><h2>Administrator sign in</h2><form id="admin-login-form"><label>Email<input id="admin-email" type="email" required /></label><label>Password<input id="admin-password" type="password" required /></label><button>Sign in</button></form></section>
+    <div id="admin-dashboard" class="hidden">
+      <form id="banner-form" class="panel"><h2>Software branding and advertisement</h2><p class="muted">The software name appears on customer, staff, admin and legal pages.</p><label>Software name<input id="software-name" maxlength="40" required /></label><label>Small heading<input id="banner-admin-eyebrow" maxlength="40" required /></label><label>Main heading<input id="banner-admin-title" maxlength="100" required /></label><label>Message<textarea id="banner-admin-message" maxlength="240" required></textarea></label><button>Save branding and advertisement</button></form>
+      <form id="login-image-form" class="panel"><h2>Staff sign-in image</h2><p class="muted">Set the image shown below “Register my barber shop”. JPG, PNG or WebP, maximum 5 MB.</p><img id="admin-login-image-preview" class="shop-photo-preview hidden" alt="Current staff sign-in image" /><label>Select image<input id="admin-login-image" type="file" accept="image/jpeg,image/png,image/webp" required /></label><button>Upload sign-in image</button></form>
+      <form id="new-shop-form" class="panel"><h2>Add a new shop</h2><label>Shop name<input id="new-shop-name" required minlength="2" /></label><label>Phone<input id="new-shop-phone" /></label><label>GST number (optional, exactly 15 characters)<input id="new-shop-gst" minlength="15" maxlength="15" pattern="[0-9A-Za-z]{15}" title="Enter exactly 15 letters and numbers, for example 27ABCDE1234F1Z5" /></label><label>Address<input id="new-shop-address" required minlength="5" /></label><label>Latitude<input id="new-shop-latitude" type="number" step="any" min="-90" max="90" /></label><label>Longitude<input id="new-shop-longitude" type="number" step="any" min="-180" max="180" /></label><label>Owner name<input id="new-owner-name" required minlength="2" /></label><label>Owner email<input id="new-owner-email" type="email" required /></label><label>Owner temporary password (minimum 8 characters)<input id="new-owner-password" type="password" minlength="8" required /></label><button>Create shop and unique QR</button></form>
+      <section><h2>All shops</h2><div id="admin-shop-list" class="management-grid"></div></section>
+    </div>
+    <p id="admin-error" class="error"></p><p id="admin-success" class="success"></p>
+  </main>
+  <script src="/static/branding.js?v=1" defer></script><script src="/static/admin.js?v=10" defer></script>
+</body>
+</html>

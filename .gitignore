@@ -1,0 +1,10 @@
+.venv/
+virtual/
+__pycache__/
+.pytest_cache/
+*.pyc
+barber.db
+barber-phase2.db
+test-barber.db
+.env
+

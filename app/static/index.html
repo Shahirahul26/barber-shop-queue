@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#17231c" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/static/styles.css?v=27" />
+    <title>TrimTime · Live barber queue</title>
+  </head>
+  <body>
+    <header class="topbar"><a class="brand" href="/">TRIM<span>TIME</span></a><nav class="topbar-actions"><a href="/staff">Staff</a><button id="customer-logout" type="button" class="ghost hidden">Log out</button></nav></header>
+    <section id="customer-auth" class="customer-auth">
+      <div class="auth-brand-visual" id="customer-auth-image"><div><p class="eyebrow" data-software-name>TRIMTIME</p><h1>Skip the waiting room.</h1><p>Scan, sign in and follow your live queue from anywhere.</p></div></div>
+      <div class="panel customer-auth-card">
+        <div id="otp-request-step"><p class="eyebrow">CUSTOMER LOGIN</p><h2>Continue with email or phone</h2><p class="muted">We verify you once on this device. Your OTP is valid for 10 minutes.</p><form id="otp-request-form" class="single-column-form"><label>Email address or mobile number<input id="customer-identifier" autocomplete="username" required /></label><button>Next</button></form></div>
+        <div id="otp-verify-step" class="hidden"><p class="eyebrow">VERIFY ACCOUNT</p><h2>Enter your OTP</h2><p id="otp-message" class="muted"></p><form id="otp-verify-form" class="single-column-form"><label>6-digit OTP<input id="customer-otp" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label><button>Next</button></form><button id="resend-customer-otp" class="forgot-link" type="button">Resend OTP</button></div>
+        <div id="customer-profile-step" class="hidden"><p class="eyebrow">ONE LAST STEP</p><h2>Create your profile</h2><div id="customer-profile-ad" class="profile-ad-image"></div><form id="customer-profile-form" class="single-column-form"><label>Your name<input id="verified-customer-name" minlength="2" autocomplete="name" required /></label><label>Age<input id="verified-customer-age" type="number" min="5" max="110" required /></label><label>Gender<select id="verified-customer-gender" required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label class="terms-check"><input id="customer-terms" type="checkbox" required /><span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span></label><button>Complete registration</button></form></div>
+        <p id="customer-auth-error" class="error" role="alert"></p><p id="development-otp" class="success"></p>
+      </div>
+    </section>
+    <main id="customer-app" class="hidden">
+      <section class="hero">
+        <img id="customer-shop-photo" class="customer-shop-photo hidden" alt="Selected barber shop" />
+        <p class="eyebrow">LIVE QUEUE · NO GUESSWORK</p>
+        <h1 id="shop-name">Your cut, without the wait.</h1>
+        <p id="shop-address" class="muted">Loading shop…</p>
+        <div class="queue-card">
+          <div><strong id="waiting-count">—</strong><span>waiting</span></div>
+          <div><strong id="wait-time">—</strong><span>estimated minutes</span></div>
+          <i class="live-dot">Live</i>
+        </div>
+        <div class="customer-primary-actions"><button id="show-join-options" type="button">Join live queue</button><button id="show-appointment-options" type="button" class="secondary">Book appointment</button></div>
+      </section>
+
+      <section class="marketplace-section"><div class="section-heading"><div><p class="eyebrow">NEAR YOU</p><h2>Other barber shops</h2></div><button type="button" id="nearby-shops" class="secondary">Use my location</button></div><div id="nearby-shop-cards" class="shop-card-grid"></div></section>
+
+      <section id="join-panel" class="panel hidden">
+        <p class="eyebrow">JOIN LIVE QUEUE</p>
+        <h2>Join this shop now</h2>
+        <form id="join-form">
+          <select id="shop" class="hidden" required></select>
+          <label>Your name<input id="customer-name" required minlength="2" autocomplete="name" /></label>
+          <label>Mobile number<input id="phone" required minlength="10" inputmode="tel" autocomplete="tel" /></label>
+          <label>Choose a service<select id="service" required></select></label>
+          <label>Choose a barber (optional)<select id="barber"></select></label>
+          <span id="prejoin-wait" class="hidden">0</span>
+          <button type="submit">Join live queue <span>→</span></button>
+        </form>
+        <p id="form-error" class="error" role="alert"></p>
+      </section>
+
+      <section id="appointment-panel" class="panel hidden">
+        <p class="eyebrow">PLAN AHEAD</p><h2>Book an appointment</h2>
+        <p id="appointment-guidance" class="muted">Choose a service and appointment time. Selecting a specific barber is optional.</p>
+        <form id="appointment-form"><label>Choose a service<select id="appointment-service" required></select></label><label>Choose a barber (optional)<select id="appointment-barber"></select></label><label>Appointment date and time<input id="appointment-time" type="datetime-local" /></label><button id="book-appointment" type="button">Book appointment</button></form>
+        <p id="appointment-result" aria-live="polite"></p>
+      </section>
+
+      <section id="appointment-ticket-panel" class="panel ticket hidden" aria-live="polite">
+        <p class="eyebrow">YOUR APPOINTMENT</p>
+        <div class="ticket-head"><h2 id="appointment-ticket-token">B-000</h2><span id="appointment-ticket-status">Booked</span></div>
+        <p id="appointment-ticket-details"></p>
+        <p id="appointment-ticket-message" class="muted"></p>
+        <button id="cancel-appointment" class="ghost" type="button">Cancel appointment</button>
+      </section>
+
+      <section id="ticket-panel" class="panel ticket hidden" aria-live="polite">
+        <p class="eyebrow">YOUR LIVE TICKET</p>
+        <div class="ticket-head"><h2 id="ticket-token">A-000</h2><span id="ticket-status">Waiting</span></div>
+        <div class="ticket-grid">
+          <div><strong id="people-ahead">—</strong><span>people ahead</span></div>
+          <div><strong id="ticket-wait">—</strong><span>minutes estimated</span></div>
+        </div>
+        <p>Barber: <strong id="ticket-barber">First available barber</strong></p>
+        <button id="notify" class="secondary">Enable live browser alerts</button>
+        <button id="leave-queue" class="secondary">Leave queue</button>
+        <form id="rating-form" class="hidden"><h2>Rate your service</h2><label>Rate the shop<select id="shop-rating" required><option value="">Choose rating</option><option value="5">5 — Excellent</option><option value="4">4 — Good</option><option value="3">3 — Average</option><option value="2">2 — Poor</option><option value="1">1 — Very poor</option></select></label><label>Shop review<textarea id="shop-review" maxlength="500" placeholder="Tell us about the shop"></textarea></label><label>Rate your barber<select id="barber-rating" required><option value="">Choose rating</option><option value="5">5 — Excellent</option><option value="4">4 — Good</option><option value="3">3 — Average</option><option value="2">2 — Poor</option><option value="1">1 — Very poor</option></select></label><label>Barber review<textarea id="barber-review" maxlength="500" placeholder="Tell us about your barber"></textarea></label><button type="submit">Submit review</button></form>
+        <p id="rating-result" class="success"></p>
+      </section>
+    </main>
+    <footer>Built for calmer shops and better cuts.</footer>
+    <script src="/static/branding.js?v=1" defer></script><script src="/static/app.js?v=34" defer></script>
+  </body>
+</html>
+
