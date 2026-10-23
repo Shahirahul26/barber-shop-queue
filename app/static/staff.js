@@ -9,6 +9,17 @@ let shopId = Number(sessionStorage.getItem("trimtimeShopId")) || 1;
 let staffRole = sessionStorage.getItem("trimtimeStaffRole") || "owner";
 let staffBarberId = Number(sessionStorage.getItem("trimtimeBarberId")) || null;
 let shop = null, socket = null, analytics = null;
+const localToday = new Date().toLocaleDateString("en-CA");
+function dateInputDisplay(value) { const [year, month, day] = value.split("-"); return `${day}/${month}/${year}`; }
+function dateInputIso(value) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) throw new Error("Enter dates in DD/MM/YYYY format, for example 21/10/2026.");
+  const [, day, month, year] = match, iso = `${year}-${month}-${day}`, parsed = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(parsed.getTime()) || parsed.getFullYear() !== Number(year) || parsed.getMonth() + 1 !== Number(month) || parsed.getDate() !== Number(day)) throw new Error("Enter a valid calendar date in DD/MM/YYYY format.");
+  return iso;
+}
+document.querySelector("#analytics-start-date").value = dateInputDisplay(localToday);
+document.querySelector("#analytics-end-date").value = dateInputDisplay(localToday);
 
 function consolidateManagementSection(sectionId, childIds) {
   const section = document.querySelector(sectionId), container = document.createElement("div"); container.className = "panel management-section";
@@ -47,6 +58,7 @@ async function request(path, options = {}) {
 }
 function message(text) { success.textContent = text; setTimeout(() => success.textContent = "", 3000); }
 function escapeHtml(value) { const node = document.createElement("span"); node.textContent = value ?? ""; return node.innerHTML; }
+function formatReportDate(value) { return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }); }
 
 function acceptSession(session, identifier = "") {
   accessToken = session.access_token; shopId = session.shop_id; staffRole = session.role; staffBarberId = session.barber_id;
@@ -86,6 +98,7 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
 
 document.querySelector("#show-registration").addEventListener("click", () => { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#registration-panel").classList.remove("hidden"); });
 document.querySelector("#back-to-login").addEventListener("click", () => { document.querySelector("#registration-panel").classList.add("hidden"); document.querySelector("#login-panel").classList.remove("hidden"); });
+if (!accessToken && new URLSearchParams(location.search).get("auth") === "signup") document.querySelector("#show-registration").click();
 document.querySelector("#show-forgot-password").addEventListener("click", () => { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#forgot-password-panel").classList.remove("hidden"); });
 document.querySelectorAll(".back-to-login").forEach((button) => button.addEventListener("click", () => { document.querySelector("#forgot-password-panel").classList.add("hidden"); document.querySelector("#login-panel").classList.remove("hidden"); }));
 
@@ -136,9 +149,13 @@ async function showBoard() {
 async function refreshAll() {
   shop = await fetch(`/api/shops/${shopId}`).then((response) => response.json());
   document.querySelector("#pause-queue").textContent = shop.queue_paused ? "Resume new joins" : "Pause new joins";
+  const walkInButton = document.querySelector("#staff-queue-submit");
+  walkInButton.disabled = shop.queue_paused;
+  walkInButton.textContent = shop.queue_paused ? "New joins are paused" : "Add to live queue";
   document.querySelector("#shop-qr").src = `/api/shops/${shopId}/qr`;
   document.querySelector("#download-qr").href = `/api/shops/${shopId}/qr`;
-  analytics = await request(`/api/shops/${shopId}/analytics`);
+  const analyticsRange = new URLSearchParams({ start_date: dateInputIso(document.querySelector("#analytics-start-date").value), end_date: dateInputIso(document.querySelector("#analytics-end-date").value) });
+  analytics = await request(`/api/shops/${shopId}/analytics?${analyticsRange}`);
   fillShopForm(); renderServices(); renderBarbers(); fillStaffBarberSelect();
   const queueEntries = await request(`/api/shops/${shopId}/queue`);
   const appointmentItems = await request(`/api/shops/${shopId}/appointments`);
@@ -146,7 +163,7 @@ async function refreshAll() {
   document.querySelector("#appointment-nav-count").textContent = appointmentItems.length;
   renderQueue(queueEntries);
   renderAppointments(appointmentItems);
-  renderAnalytics(analytics);
+  renderRangeAnalytics(analytics);
   try { renderStaff(await request(`/api/shops/${shopId}/staff`)); } catch (_) {}
 }
 
@@ -157,11 +174,11 @@ function renderAppointments(items) {
   list.querySelectorAll("[data-appointment]").forEach((button) => button.addEventListener("click", async () => { try { await request(`/api/appointments/${button.dataset.appointment}`, { method: "PATCH", body: JSON.stringify({ status: button.dataset.appointmentStatus }) }); message(button.dataset.appointmentStatus === "cancelled" ? "Appointment cancelled" : "Appointment completed"); await refreshAll(); } catch (reason) { error.textContent = reason.message; } }));
 }
 
-function renderAnalytics(data) {
-  const barberCards = (data.barbers || []).map((barber) => `<article class="mini-card"><span>Barber</span><strong>${escapeHtml(barber.barber_name)}</strong><small>${barber.waiting} waiting · ${barber.serving} serving</small><span>${barber.completed_services} completed · ${barber.appointments} appointments · ${barber.cancelled_appointments || 0} cancelled</span><span>★ ${barber.average_rating || 0} · ${barber.review_count || 0} reviews</span><span>₹${barber.estimated_revenue_rupees} revenue</span></article>`).join("");
-  const dailyCards = (data.daily_revenue || []).map((day) => `<article class="mini-card"><span>${new Date(`${day.date}T00:00:00`).toLocaleDateString()}</span><strong>₹${day.total_revenue_rupees}</strong>${day.barbers.map((barber) => `<small>${escapeHtml(barber.barber_name)}: ₹${barber.revenue_rupees}</small>`).join("")}</article>`).join("");
-  const dailySection = dailyCards || '<article class="mini-card"><span>Daily revenue</span><strong>₹0</strong><small>No completed services this month.</small></article>';
-  document.querySelector("#analytics-grid").innerHTML = `<article class="mini-card"><span>Today's revenue</span><strong>₹${data.today_revenue_rupees}</strong></article><article class="mini-card"><span>This month's revenue</span><strong>₹${data.month_revenue_rupees}</strong></article><article class="mini-card"><span>All-time revenue</span><strong>₹${data.estimated_revenue_rupees}</strong></article><article class="mini-card"><span>Completed services</span><strong>${data.completed_services}</strong></article><article class="mini-card"><span>Cancelled appointments</span><strong>${data.cancelled_appointments || 0}</strong></article>${barberCards}<div class="analytics-daily"><h2>Daily revenue this month</h2><div class="management-grid">${dailySection}</div></div>`;
+function renderRangeAnalytics(data) {
+  const barberCards = (data.barbers || []).map((barber) => `<article class="mini-card"><span>Barber</span><strong>${escapeHtml(barber.barber_name)}</strong><small>${barber.waiting} waiting &middot; ${barber.serving} serving</small><span>${barber.completed_services} completed &middot; ${barber.appointments} appointments &middot; ${barber.cancelled_appointments || 0} cancelled</span><span>&#9733; ${barber.average_rating || 0} &middot; ${barber.review_count || 0} reviews</span><span>&#8377;${barber.estimated_revenue_rupees} revenue</span></article>`).join("");
+  const dailyCards = (data.daily_revenue || []).map((day) => `<article class="mini-card"><span>${formatReportDate(day.date)}</span><strong>&#8377;${day.total_revenue_rupees}</strong>${day.barbers.map((barber) => `<small>${escapeHtml(barber.barber_name)}: &#8377;${barber.revenue_rupees}</small>`).join("")}</article>`).join("");
+  const dailySection = dailyCards || '<article class="mini-card"><span>Daily revenue</span><strong>&#8377;0</strong><small>No completed services in this date range.</small></article>';
+  document.querySelector("#analytics-grid").innerHTML = `<article class="mini-card"><span>Revenue</span><strong>&#8377;${data.estimated_revenue_rupees}</strong></article><article class="mini-card"><span>Completed services</span><strong>${data.completed_services}</strong></article><article class="mini-card"><span>Appointments</span><strong>${data.appointments || 0}</strong></article><article class="mini-card"><span>Cancelled appointments</span><strong>${data.cancelled_appointments || 0}</strong></article><article class="mini-card"><span>Queue entries</span><strong>${data.total_queue_entries || 0}</strong></article>${barberCards}<div class="analytics-daily"><h2>Daily revenue &middot; ${formatReportDate(data.range_start)} to ${formatReportDate(data.range_end)}</h2><div class="management-grid">${dailySection}</div></div>`;
 }
 
 function fillStaffBarberSelect() {
@@ -187,10 +204,12 @@ function renderQueue(entries) {
     const card = document.createElement("article"); card.className = `queue-item ${entry.status}`;
     const availableBarbers = staffRole === "barber" ? shop.barbers.filter((barber) => barber.id === staffBarberId) : shop.barbers;
     const options = availableBarbers.map((barber) => `<option value="${barber.id}" ${entry.barber_id === barber.id || (staffRole === "barber" && barber.id === staffBarberId) ? "selected" : ""}>${escapeHtml(barber.name)}</option>`).join("");
+    const selectedServiceIds = new Set(entry.service_ids || (entry.service_id ? [entry.service_id] : []));
+    const serviceOptions = shop.services.map((service) => `<label><input type="checkbox" value="${service.id}" ${selectedServiceIds.has(service.id) ? "checked" : ""} ${staffRole === "barber" || entry.source === "appointment" ? "disabled" : ""} /><span>${escapeHtml(service.name)} <small>₹${service.price_rupees}</small></span></label>`).join("");
     const actions = entry.status === "waiting" ? `<button data-action="start">${staffRole === "barber" ? "Claim & start" : "Start"}</button>${staffRole === "barber" ? "" : '<button data-action="skip" class="secondary">Skip</button>'}` : entry.status === "serving" ? '<button data-action="complete">Mark done</button>' : '<button data-action="restore" class="secondary">Restore to queue</button>';
-    const position = entry.status === "serving" ? "In chair" : entry.status === "skipped" ? "Skipped · not blocking queue" : `${entry.people_ahead} ahead · ~${entry.estimated_wait_minutes} min`;
-    card.innerHTML = `<div class="token">${entry.token}</div><div class="customer"><strong>${escapeHtml(entry.customer_name)}</strong><span>${escapeHtml(entry.service_name)} · ${entry.source === "appointment" ? "PRIORITY APPOINTMENT" : entry.source.replace("_", " ")}</span>${entry.email ? `<small>${escapeHtml(entry.email)}</small>` : ""}<select class="barber-select" ${staffRole === "barber" ? "disabled" : ""}><option value="">Assign barber</option>${options}</select></div><div class="position">${position}</div><div class="actions">${actions}${staffRole === "barber" ? "" : '<button data-action="cancel" class="ghost">Cancel</button>'}</div>`;
-    card.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => queueAction(entry.id, button.dataset.action, card.querySelector(".barber-select").value))); list.append(card);
+    const position = entry.status === "serving" ? "In chair" : entry.availability_message || `${entry.people_ahead} ${entry.ahead_label || "people ahead"} · ~${entry.estimated_wait_minutes} min`;
+    card.innerHTML = `<div class="token">${entry.token}</div><div class="customer"><strong>${escapeHtml(entry.customer_name)}</strong><span>${escapeHtml(entry.service_name)} · ${entry.source === "appointment" ? "PRIORITY APPOINTMENT" : entry.source.replace("_", " ")}</span>${entry.email ? `<small>${escapeHtml(entry.email)}</small>` : ""}<div class="queue-assignment-controls"><div class="queue-assignment-control"><span class="control-caption">Choose services</span><details class="queue-service-picker"><summary>Select services</summary><div class="queue-service-checks">${serviceOptions}</div></details></div><div class="queue-assignment-control"><span class="control-caption">Assign barber</span><select class="barber-select" ${staffRole === "barber" ? "disabled" : ""}><option value="">Assign barber</option>${options}</select></div></div><p class="queue-card-error error" aria-live="polite"></p></div><div class="position">${position}</div><div class="actions">${actions}${staffRole === "barber" ? "" : '<button data-action="cancel" class="ghost">Cancel</button>'}</div>`;
+    card.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => queueAction(entry.id, button.dataset.action, card.querySelector(".barber-select").value, [...card.querySelectorAll(".queue-service-checks input:checked")].map((input) => Number(input.value)), card))); list.append(card);
   });
 }
 
@@ -233,9 +252,14 @@ async function deleteStaff(staffId) {
   catch (reason) { error.textContent = reason.message; }
 }
 
-async function queueAction(id, action, barberId) {
-  try { await request(`/api/queue/${id}/action`, { method: "POST", body: JSON.stringify({ action, barber_id: barberId ? Number(barberId) : null }) }); await refreshAll(); }
-  catch (reason) { error.textContent = reason.message; }
+async function queueAction(id, action, barberId, serviceIds, card) {
+  const cardError = card?.querySelector(".queue-card-error");
+  const showCardError = (text) => { if (cardError) { cardError.textContent = text; setTimeout(() => { if (cardError.textContent === text) cardError.textContent = ""; }, 5000); } else error.textContent = text; };
+  if (action === "start" && !serviceIds.length && !barberId) { showCardError("Please choose a service and assign a barber before starting."); return; }
+  if (action === "start" && !serviceIds.length) { showCardError("Please choose at least one service before starting."); return; }
+  if (action === "start" && !barberId) { showCardError("Please assign a barber before starting."); return; }
+  try { await request(`/api/queue/${id}/action`, { method: "POST", body: JSON.stringify({ action, barber_id: barberId ? Number(barberId) : null, service_ids: serviceIds }) }); await refreshAll(); }
+  catch (reason) { showCardError(reason.message); }
 }
 async function editService(id) {
   const service = shop.services.find((item) => item.id === id); const name = prompt("Service name", service.name); if (!name) return;
@@ -259,6 +283,7 @@ async function deleteBarber(id) {
 
 document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
   const target = button.dataset.tab;
+  const fromDashboardNav = Boolean(button.closest(".dashboard-nav"));
   const managementTargets = ["services", "team", "analytics", "settings", "shop"];
   const canManage = ["owner", "manager"].includes(staffRole);
   const dashboard = document.querySelector("#dashboard");
@@ -266,20 +291,24 @@ document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListe
   document.querySelectorAll(".tab-section").forEach((section) => section.classList.add("hidden"));
   if (target === "account") {
     if (canManage) managementTargets.forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
-    else document.querySelector("#tab-settings").classList.remove("hidden");
+    else ["analytics", "settings"].forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
     document.querySelector("#account-management-nav").classList.remove("hidden");
+  } else if (target === "analytics" && fromDashboardNav) {
+    document.querySelector("#tab-analytics").classList.remove("hidden");
+    document.querySelector("#account-management-nav").classList.add("hidden");
   } else if (managementTargets.includes(target) && canManage) {
     managementTargets.forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
     document.querySelector("#account-management-nav").classList.remove("hidden");
     setTimeout(() => document.querySelector(`#tab-${target}`).scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  } else if (target === "settings") {
-    document.querySelector("#tab-settings").classList.remove("hidden");
+  } else if (["analytics", "settings"].includes(target)) {
+    document.querySelector(`#tab-${target}`).classList.remove("hidden");
     document.querySelector("#account-management-nav").classList.remove("hidden");
   } else {
     document.querySelector(`#tab-${target === "account" ? "settings" : target}`).classList.remove("hidden");
     document.querySelector("#account-management-nav").classList.add("hidden");
   }
-  document.querySelectorAll(".dashboard-nav [data-tab]").forEach((item) => item.classList.toggle("active", item.dataset.tab === (managementTargets.includes(target) ? "account" : target)));
+  const dashboardTarget = ["services", "team", "settings", "shop"].includes(target) ? "account" : target;
+  document.querySelectorAll(".dashboard-nav [data-tab]").forEach((item) => item.classList.toggle("active", item.dataset.tab === dashboardTarget));
   document.querySelectorAll("#account-management-nav [data-tab]").forEach((item) => item.classList.toggle("active", item.dataset.tab === target));
 }));
 const accountSectionObserver = new IntersectionObserver((entries) => {
@@ -291,14 +320,34 @@ const accountSectionObserver = new IntersectionObserver((entries) => {
 }, { rootMargin: "-190px 0px -45% 0px", threshold: [0, .1, .25, .5] });
 ["services", "team", "analytics", "settings", "shop"].forEach((name) => accountSectionObserver.observe(document.querySelector(`#tab-${name}`)));
 document.querySelector("#logout").addEventListener("click", logout);
+document.querySelector("#analytics-filter").addEventListener("submit", async (event) => {
+  event.preventDefault(); error.textContent = "";
+  let startDate, endDate;
+  try { startDate = dateInputIso(document.querySelector("#analytics-start-date").value); endDate = dateInputIso(document.querySelector("#analytics-end-date").value); }
+  catch (reason) { error.textContent = reason.message; return; }
+  if (endDate < startDate) { error.textContent = "To date must be the same as or later than From date."; return; }
+  try { await refreshAll(); message(`Report generated for ${formatReportDate(startDate)} to ${formatReportDate(endDate)}`); }
+  catch (reason) { error.textContent = reason.message; }
+});
 document.querySelector("#pause-queue").addEventListener("click", async () => { await request(`/api/shops/${shopId}/state`, { method: "PATCH", body: JSON.stringify({ queue_paused: !shop.queue_paused }) }); await refreshAll(); });
 document.querySelector("#staff-queue-form").addEventListener("submit", async (event) => {
   event.preventDefault(); error.textContent = "";
+  const result = document.querySelector("#staff-queue-result"), submit = document.querySelector("#staff-queue-submit");
+  result.className = "form-result"; result.textContent = "";
   const barberId = document.querySelector("#staff-queue-barber").value;
   try {
-    await request(`/api/shops/${shopId}/queue`, { method: "POST", body: JSON.stringify({ customer_name: document.querySelector("#staff-queue-name").value.trim(), phone: document.querySelector("#staff-queue-phone").value.trim() || null, email: document.querySelector("#staff-queue-email").value.trim().toLowerCase() || null, service_id: Number(document.querySelector("#staff-queue-service").value), barber_id: barberId ? Number(barberId) : null, source: "walk_in" }) });
-    event.target.reset(); message("Customer added to the live queue"); await refreshAll();
-  } catch (reason) { error.textContent = reason.message; }
+    const serviceId = Number(document.querySelector("#staff-queue-service").value);
+    if (!serviceId) throw new Error("Please select a service before adding the customer.");
+    submit.disabled = true; submit.textContent = "Adding customer...";
+    const created = await request(`/api/shops/${shopId}/queue`, { method: "POST", body: JSON.stringify({ customer_name: document.querySelector("#staff-queue-name").value.trim(), phone: document.querySelector("#staff-queue-phone").value.trim() || null, email: document.querySelector("#staff-queue-email").value.trim().toLowerCase() || null, service_id: serviceId, barber_id: barberId ? Number(barberId) : null, source: "walk_in" }) });
+    event.target.reset(); fillStaffBarberSelect();
+    const queueEntries = await request(`/api/shops/${shopId}/queue`);
+    renderQueue(queueEntries); document.querySelector("#queue-nav-count").textContent = queueEntries.filter((entry) => ["waiting", "serving"].includes(entry.status)).length;
+    result.classList.add("success"); result.textContent = `${created.customer_name} added successfully with token ${created.token}.`;
+    message("Customer added to the live queue");
+    setTimeout(() => document.querySelector('.dashboard-nav [data-tab="queue"]').click(), 900);
+  } catch (reason) { result.classList.add("error"); result.textContent = reason.message; error.textContent = reason.message; }
+  finally { submit.disabled = Boolean(shop?.queue_paused); submit.textContent = shop?.queue_paused ? "New joins are paused" : "Add to live queue"; }
 });
 document.querySelector("#shop-form").addEventListener("submit", async (event) => { event.preventDefault(); await request(`/api/shops/${shopId}`, { method: "PATCH", body: JSON.stringify({ name: document.querySelector("#shop-profile-name").value, phone: document.querySelector("#shop-phone").value || null, gst_number: document.querySelector("#shop-gst").value.toUpperCase() || null, address: document.querySelector("#shop-profile-address").value, opens_at: document.querySelector("#opens-at").value, closes_at: document.querySelector("#closes-at").value, timezone: document.querySelector("#shop-timezone").value }) }); message("Shop details saved"); await refreshAll(); });
 document.querySelector("#shop-photo-form").addEventListener("submit", async (event) => {

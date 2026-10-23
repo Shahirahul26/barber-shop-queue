@@ -17,6 +17,8 @@ def notify_queue_milestones(db: Session, shop_id: int) -> None:
         if not entry.push_subscriptions:
             continue
         view = queue_view(db, entry)
+        if view["availability_message"]:
+            continue
         title = body = None
         if entry.status == QueueStatus.SERVING and entry.next_notified_at is None:
             title, body = "Your barber is ready", "Please proceed to the chair."
@@ -25,7 +27,8 @@ def notify_queue_milestones(db: Session, shop_id: int) -> None:
             title, body = "You are next", "Please reach the shop now."
             entry.next_notified_at = datetime.now(timezone.utc)
         elif view["people_ahead"] is not None and view["people_ahead"] <= 2 and entry.two_ahead_notified_at is None:
-            title, body = "Only two customers left", "Get ready to leave for the shop."
+            unit = "turns" if view["ahead_label"] == "turns ahead" else "customers"
+            title, body = f"Only two {unit} left", "Get ready to leave for the shop."
             entry.two_ahead_notified_at = datetime.now(timezone.utc)
         if not body:
             continue

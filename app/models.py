@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -110,25 +110,35 @@ class Service(Base):
 
 class QueueEntry(Base):
     __tablename__ = "queue_entries"
+    __table_args__ = (UniqueConstraint("shop_id", "queue_day", "daily_token_number", name="uq_queue_daily_token"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     public_token: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=lambda: str(uuid4()))
     shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customer_users.id"), nullable=True, index=True)
     appointment_id: Mapped[int | None] = mapped_column(ForeignKey("appointments.id"), nullable=True, unique=True, index=True)
-    service_id: Mapped[int] = mapped_column(ForeignKey("services.id"))
+    service_id: Mapped[int | None] = mapped_column(ForeignKey("services.id"), nullable=True)
+    service_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    service_names: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    total_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_price_rupees: Mapped[int | None] = mapped_column(Integer, nullable=True)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True)
     customer_name: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[QueueStatus] = mapped_column(SqlEnum(QueueStatus, native_enum=False), default=QueueStatus.WAITING, index=True)
     source: Mapped[str] = mapped_column(String(20), default="online")
+    priority_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    queue_day: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    daily_token_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     two_ahead_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     next_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     shop: Mapped[Shop] = relationship(back_populates="queue_entries")
-    service: Mapped[Service] = relationship()
+    service: Mapped[Service | None] = relationship()
     barber: Mapped[Barber | None] = relationship(back_populates="queue_entries")
+    appointment: Mapped["Appointment"] = relationship()
     push_subscriptions: Mapped[list["PushSubscription"]] = relationship(back_populates="queue_entry", cascade="all, delete-orphan")
 
 
@@ -145,14 +155,22 @@ class PushSubscription(Base):
 
 class Appointment(Base):
     __tablename__ = "appointments"
+    __table_args__ = (UniqueConstraint("shop_id", "booking_day", "daily_booking_number", name="uq_appointment_daily_token"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     public_token: Mapped[str] = mapped_column(String(36), unique=True, index=True, default=lambda: str(uuid4()))
     shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customer_users.id"), nullable=True, index=True)
     service_id: Mapped[int] = mapped_column(ForeignKey("services.id"))
+    service_ids: Mapped[list[int]] = mapped_column(JSON)
+    service_names: Mapped[str] = mapped_column(String(500))
+    total_duration_minutes: Mapped[int] = mapped_column(Integer)
+    total_price_rupees: Mapped[int] = mapped_column(Integer)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True)
     customer_name: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    booking_day: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    daily_booking_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="booked", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     shop: Mapped[Shop] = relationship(back_populates="appointments")
@@ -165,6 +183,7 @@ class Rating(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
     queue_entry_id: Mapped[int | None] = mapped_column(ForeignKey("queue_entries.id"), nullable=True, unique=True)
+    appointment_id: Mapped[int | None] = mapped_column(ForeignKey("appointments.id"), nullable=True, unique=True)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True, index=True)
     stars: Mapped[int] = mapped_column(Integer)
     comment: Mapped[str | None] = mapped_column(String(500), nullable=True)

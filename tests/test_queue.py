@@ -58,20 +58,22 @@ def test_queue_pause_blocks_customer_join():
         client.patch("/api/shops/1/state", headers=auth, json={"queue_paused": False})
 
 
-def test_skipped_customer_does_not_block_and_can_restore_at_end():
+def test_skipped_customer_remains_active_and_moves_to_end():
     with TestClient(app) as client:
         token = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()["access_token"]
         auth = {"Authorization": f"Bearer {token}"}
         shop = client.get("/api/shops/1").json()
         first = client.post("/api/shops/1/queue", json={"customer_name": "Late Customer", "phone": "9876543220", "service_id": shop["services"][0]["id"]}).json()
-        client.post(f"/api/queue/{first['id']}/action", headers=auth, json={"action": "skip"})
+        skipped = client.post(f"/api/queue/{first['id']}/action", headers=auth, json={"action": "skip"})
+        assert skipped.status_code == 200
+        assert skipped.json()["status"] == "waiting"
         second = client.post("/api/shops/1/queue", json={"customer_name": "Present Customer", "phone": "9876543221", "service_id": shop["services"][0]["id"]}).json()
         visible = client.get("/api/shops/1/queue", headers=auth).json()
-        assert any(item["id"] == first["id"] and item["status"] == "skipped" for item in visible)
-        assert next(item for item in visible if item["id"] == second["id"])["people_ahead"] == 0
-        restored = client.post(f"/api/queue/{first['id']}/action", headers=auth, json={"action": "restore"})
-        assert restored.status_code == 200
-        assert restored.json()["people_ahead"] == 1
+        assert next(index for index, item in enumerate(visible) if item["id"] == first["id"]) < next(index for index, item in enumerate(visible) if item["id"] == second["id"])
+        repeated_skip = client.post(f"/api/queue/{first['id']}/action", headers=auth, json={"action": "skip"})
+        assert repeated_skip.status_code == 200
+        visible = client.get("/api/shops/1/queue", headers=auth).json()
+        assert next(index for index, item in enumerate(visible) if item["id"] == second["id"]) < next(index for index, item in enumerate(visible) if item["id"] == first["id"])
 
 
 def test_platform_admin_creates_shop_with_unique_qr_and_appointment():
@@ -145,12 +147,17 @@ def test_shop_self_registration_barber_permissions_and_appointment_conflict():
         assert staff.json()["barber_id"] == barber["id"]
 
         appointment_time = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=1)).replace(hour=12, minute=30, second=0, microsecond=0).isoformat()
+        slot_date = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=1)).date().isoformat()
+        slots = client.get(f"/api/shops/{shop_id}/appointment-slots", params={"appointment_date": slot_date, "service_id": service["id"]})
+        assert slots.status_code == 200
+        assert slots.json()["service_duration_minutes"] == 30
+        assert slots.json()["slots"]
         first = client.post(f"/api/shops/{shop_id}/appointments", json={"customer_name": "First Customer", "phone": "9876543210", "service_id": service["id"], "barber_id": barber["id"], "scheduled_at": appointment_time})
         assert first.status_code == 201
-        assert first.json()["token"].startswith("B-")
+        assert first.json()["token"] == "B01"
         conflict = client.post(f"/api/shops/{shop_id}/appointments", json={"customer_name": "Second Customer", "phone": "9876543211", "service_id": service["id"], "barber_id": barber["id"], "scheduled_at": appointment_time})
         assert conflict.status_code == 409
-        assert "already has an appointment" in conflict.json()["detail"]
+        assert "unavailable" in conflict.json()["detail"]
 
         barber_login = client.post("/api/auth/login", json={"email": "asha@example.com", "password": "Temporary123!"}).json()
         barber_auth = {"Authorization": f"Bearer {barber_login['access_token']}"}
@@ -173,7 +180,7 @@ def test_shop_self_registration_barber_permissions_and_appointment_conflict():
         assert customer_view.json()["status"] == "cancelled"
         visible_appointments = client.get(f"/api/shops/{shop_id}/appointments", headers=auth).json()
         assert all(item["id"] != first.json()["id"] for item in visible_appointments)
-        analytics = client.get(f"/api/shops/{shop_id}/analytics", headers=auth).json()
+        analytics = client.get(f"/api/shops/{shop_id}/analytics", headers=auth, params={"start_date": datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat(), "end_date": slot_date}).json()
         assert analytics["cancelled_appointments"] == 1
         assert analytics["barbers"][0]["cancelled_appointments"] == 1
         outside_hours = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=1)).replace(hour=21, minute=0, second=0, microsecond=0)
@@ -182,9 +189,57 @@ def test_shop_self_registration_barber_permissions_and_appointment_conflict():
         assert "opening hours" in rejected_time.json()["detail"]
         customer_booking_time = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=1)).replace(hour=13, minute=30, second=0, microsecond=0)
         customer_booking = client.post(f"/api/shops/{shop_id}/appointments", json={"customer_name": "Customer Cancel", "phone": "9876543214", "service_id": service["id"], "barber_id": barber["id"], "scheduled_at": customer_booking_time.isoformat()}).json()
+        assert customer_booking["token"] == "B02"
         customer_cancelled = client.post("/api/my-appointment/cancel", json={"public_token": customer_booking["public_token"]})
         assert customer_cancelled.status_code == 200
         assert customer_cancelled.json()["status"] == "cancelled"
+        next_service_day = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=2)).replace(hour=12, minute=30, second=0, microsecond=0)
+        next_day_booking = client.post(f"/api/shops/{shop_id}/appointments", json={"customer_name": "New Day First", "phone": "9876543215", "service_id": service["id"], "barber_id": barber["id"], "scheduled_at": next_service_day.isoformat()})
+        assert next_day_booking.status_code == 201
+        assert next_day_booking.json()["token"] == "B01"
+
+
+def test_active_barbers_display_fixed_fifo_rounds_not_workload_lanes():
+    with TestClient(app) as client:
+        registered = client.post("/api/auth/register-shop", json={"name": "Round Queue Salon", "address": "50 Queue Road", "owner_name": "Round Owner", "owner_email": "round-owner@example.com", "owner_password": "StrongPass123!", "terms_accepted": True}).json()
+        auth = {"Authorization": f"Bearer {registered['access_token']}"}
+        shop_id = registered["shop_id"]
+        barber_one = client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={"name": "Barber One"}).json()
+        barber_two = client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={"name": "Barber Two"}).json()
+        client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={"name": "Barber Three"})
+        service = client.post(f"/api/shops/{shop_id}/services", headers=auth, json={"name": "Standard Cut", "duration_minutes": 30, "price_rupees": 300}).json()
+
+        serving = []
+        for number, barber in enumerate((barber_one, barber_two), start=1):
+            entry = client.post(f"/api/shops/{shop_id}/queue", json={"customer_name": f"Serving {number}", "phone": f"987650010{number}", "service_id": service["id"], "barber_id": barber["id"], "source": "walk_in"}).json()
+            serving.append(client.post(f"/api/queue/{entry['id']}/action", headers=auth, json={"action": "start", "barber_id": barber["id"]}).json())
+
+        waiting_ids = []
+        for number in range(1, 8):
+            entry = client.post(f"/api/shops/{shop_id}/queue", json={"customer_name": f"Waiting {number}", "phone": f"987650020{number}", "service_id": service["id"], "source": "walk_in"}).json()
+            waiting_ids.append(entry["id"])
+
+        queue = client.get(f"/api/shops/{shop_id}/queue", headers=auth).json()
+        waiting = [next(item for item in queue if item["id"] == entry_id) for entry_id in waiting_ids]
+        assert [item["people_ahead"] for item in waiting] == [0, 0, 0, 1, 1, 1, 2]
+        assert all(item["ahead_label"] == "turns ahead" for item in waiting)
+        assert [item["token"] for item in queue if item["id"] in waiting_ids] == ["A03", "A04", "A05", "A06", "A07", "A08", "A09"]
+
+        unassigned = client.post(f"/api/shops/{shop_id}/queue", json={"customer_name": "Needs Assignment", "phone": "9876500299"}).json()
+        missing_both = client.post(f"/api/queue/{unassigned['id']}/action", headers=auth, json={"action": "start"})
+        assert missing_both.status_code == 400
+        assert missing_both.json()["detail"] == "Please choose a service and assign a barber before starting"
+        missing_barber = client.post(f"/api/queue/{unassigned['id']}/action", headers=auth, json={"action": "start", "service_ids": [service["id"]]})
+        assert missing_barber.status_code == 400
+        assert missing_barber.json()["detail"] == "Please assign a barber before starting"
+        missing_service = client.post(f"/api/queue/{unassigned['id']}/action", headers=auth, json={"action": "start", "barber_id": barber_one["id"]})
+        assert missing_service.status_code == 400
+        assert missing_service.json()["detail"] == "Please choose at least one service before starting"
+        busy_barber = client.post(f"/api/queue/{unassigned['id']}/action", headers=auth, json={"action": "start", "barber_id": barber_one["id"], "service_ids": [service["id"]]})
+        assert busy_barber.status_code == 409
+        assert "already serving another customer" in busy_barber.json()["detail"]
+
+
 def test_due_appointment_enters_queue_with_priority_and_stays_linked():
     with TestClient(app) as client:
         session = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
@@ -198,13 +253,14 @@ def test_due_appointment_enters_queue_with_priority_and_stays_linked():
         assert booked["phone"] is None
         with SessionLocal() as db:
             appointment = db.get(Appointment, booked["id"])
-            appointment.scheduled_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            service_duration = db.get(QueueEntry, walk_in["id"]).service.duration_minutes
+            appointment.scheduled_at = datetime.now(timezone.utc) + timedelta(minutes=service_duration, seconds=-1)
             db.commit()
         queue = client.get("/api/shops/1/queue", headers=auth).json()
         priority = next(item for item in queue if item["customer_name"] == "Priority Booking")
         assert priority["source"] == "appointment"
         assert priority["token"] == booked["token"]
-        assert priority["token"].startswith("B-")
+        assert priority["token"].startswith("B")
         assert queue.index(priority) < next(index for index, item in enumerate(queue) if item["id"] == walk_in["id"])
         client.post(f"/api/queue/{priority['id']}/action", headers=auth, json={"action": "start", "barber_id": shop["barbers"][0]["id"]})
         client.post(f"/api/queue/{priority['id']}/action", headers=auth, json={"action": "complete"})
@@ -218,6 +274,24 @@ def test_due_appointment_enters_queue_with_priority_and_stays_linked():
         assert all(item["id"] != walk_in["id"] for item in queue_after_reset)
         with SessionLocal() as db:
             assert db.get(QueueEntry, walk_in["id"]).status == QueueStatus.CANCELLED
+
+
+def test_staff_appointment_list_hides_past_shop_local_dates():
+    with TestClient(app) as client:
+        session = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        auth = {"Authorization": f"Bearer {session['access_token']}"}
+        shop = client.get("/api/shops/1").json()
+        tomorrow = (datetime.now(ZoneInfo(shop["timezone"])) + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0)
+        created = client.post("/api/shops/1/appointments", json={"customer_name": "Old Appointment", "phone": "9876500777", "service_id": shop["services"][0]["id"], "scheduled_at": tomorrow.isoformat()})
+        assert created.status_code == 201
+        appointment_id = created.json()["id"]
+        with SessionLocal() as db:
+            appointment = db.get(Appointment, appointment_id)
+            appointment.scheduled_at = datetime.now(timezone.utc) - timedelta(days=1)
+            db.commit()
+        visible = client.get("/api/shops/1/appointments", headers=auth)
+        assert visible.status_code == 200
+        assert all(item["id"] != appointment_id for item in visible.json())
 
 
 def test_customer_first_login_otp_terms_and_persistent_session():
@@ -235,3 +309,15 @@ def test_customer_first_login_otp_terms_and_persistent_session():
         me = client.get("/api/customer-auth/me", headers={"Authorization": f"Bearer {token}"})
         assert me.status_code == 200
         assert me.json()["name"] == "Verified Customer"
+        customer_auth = {"Authorization": f"Bearer {token}"}
+        shop = client.get("/api/shops/1").json()
+        visit = client.post("/api/shops/1/queue", headers=customer_auth, json={"customer_name": "Verified Customer", "phone": "9876500999", "service_id": shop["services"][0]["id"]})
+        assert visit.status_code == 201
+        owner = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        owner_auth = {"Authorization": f"Bearer {owner['access_token']}"}
+        client.post(f"/api/queue/{visit.json()['id']}/action", headers=owner_auth, json={"action": "start", "barber_id": shop["barbers"][0]["id"]})
+        client.post(f"/api/queue/{visit.json()['id']}/action", headers=owner_auth, json={"action": "complete"})
+        history = client.get("/api/customer-auth/history", headers=customer_auth)
+        assert history.status_code == 200
+        assert history.json()[0]["service"] == shop["services"][0]["name"]
+        assert history.json()[0]["barber"] == shop["barbers"][0]["name"]

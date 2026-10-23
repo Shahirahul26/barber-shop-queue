@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from contextlib import suppress
-from datetime import datetime, timedelta, timezone, time as dt_time
+from datetime import date, datetime, timedelta, timezone, time as dt_time
 from io import BytesIO
 from math import asin, cos, radians, sin, sqrt
 from pathlib import Path
@@ -14,7 +14,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
 import qrcode
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -67,7 +67,26 @@ def normalize_phone(value: str | None) -> str | None:
 
 
 def appointment_view(item: Appointment) -> dict:
-    return {"id": item.id, "public_token": item.public_token, "token": f"B-{item.id:03d}", "shop_id": item.shop_id, "customer_name": item.customer_name, "phone": item.phone, "service_name": item.service.name, "barber_name": item.barber.name if item.barber else None, "scheduled_at": item.scheduled_at, "status": item.status}
+    service_ids = item.service_ids or [item.service_id]
+    return {"id": item.id, "public_token": item.public_token, "token": f"B{(item.daily_booking_number or item.id):02d}", "shop_id": item.shop_id, "service_id": item.service_id, "service_ids": service_ids, "barber_id": item.barber_id, "customer_name": item.customer_name, "phone": item.phone, "service_name": item.service_names or item.service.name, "total_duration_minutes": item.total_duration_minutes or item.service.duration_minutes, "total_price_rupees": item.total_price_rupees if item.total_price_rupees is not None else item.service.price_rupees, "barber_name": item.barber.name if item.barber else None, "scheduled_at": item.scheduled_at, "status": item.status}
+
+
+def appointment_duration(item: Appointment) -> int:
+    return item.total_duration_minutes or item.service.duration_minutes
+
+
+def optional_customer(request: Request, db: Session) -> CustomerUser | None:
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        return None
+    try:
+        payload = decode_access_token(header[7:])
+    except HTTPException:
+        return None
+    if payload.get("type") != "customer":
+        return None
+    customer = db.get(CustomerUser, int(payload["sub"]))
+    return customer if customer and customer.is_verified else None
 
 
 def audit(db: Session, action: str, staff: StaffUser | None = None, shop_id: int | None = None, details: str | None = None) -> None:
@@ -103,15 +122,21 @@ def seed_demo_data() -> None:
 
 def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int]:
     now = datetime.now(timezone.utc)
-    statement = select(Appointment).where(Appointment.status.in_(("booked", "confirmed")), Appointment.scheduled_at <= now).order_by(Appointment.scheduled_at, Appointment.id).with_for_update(skip_locked=True)
+    # selectinload uses a separate SELECT for services. A joinedload would add a
+    # LEFT OUTER JOIN, which PostgreSQL cannot combine with FOR UPDATE here.
+    statement = select(Appointment).options(selectinload(Appointment.service)).where(Appointment.status.in_(("booked", "confirmed"))).order_by(Appointment.scheduled_at, Appointment.id).with_for_update(skip_locked=True)
     if shop_id is not None:
         statement = statement.where(Appointment.shop_id == shop_id)
     promoted_shops: set[int] = set()
     for appointment in db.scalars(statement).all():
+        scheduled_at = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
+        queue_entry_time = scheduled_at - timedelta(minutes=appointment_duration(appointment))
+        if queue_entry_time > now:
+            continue
         if db.scalar(select(QueueEntry.id).where(QueueEntry.appointment_id == appointment.id)):
             appointment.status = "queued"
             continue
-        db.add(QueueEntry(appointment_id=appointment.id, shop_id=appointment.shop_id, service_id=appointment.service_id, barber_id=appointment.barber_id, customer_name=appointment.customer_name, phone=appointment.phone, source="appointment", joined_at=appointment.scheduled_at))
+        db.add(QueueEntry(appointment_id=appointment.id, shop_id=appointment.shop_id, customer_id=appointment.customer_id, service_id=appointment.service_id, service_ids=appointment.service_ids, service_names=appointment.service_names, total_duration_minutes=appointment.total_duration_minutes, total_price_rupees=appointment.total_price_rupees, barber_id=appointment.barber_id, customer_name=appointment.customer_name, phone=appointment.phone, source="appointment", joined_at=queue_entry_time))
         appointment.status = "queued"
         audit(db, "appointment.promoted_to_queue", shop_id=appointment.shop_id, details=f"appointment_id={appointment.id}")
         promoted_shops.add(appointment.shop_id)
@@ -211,6 +236,11 @@ def require_staff_manager(staff: StaffUser, target: StaffUser) -> None:
 
 
 @app.get("/", include_in_schema=False)
+def landing_page():
+    return FileResponse(STATIC_DIR / "landing.html")
+
+
+@app.get("/customer", include_in_schema=False)
 def customer_page():
     return FileResponse(STATIC_DIR / "index.html")
 
@@ -438,6 +468,39 @@ def customer_me(request: Request, db: Session = Depends(get_db)):
     return {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}
 
 
+@app.get("/api/customer-auth/active-queue", response_model=QueueEntryOut | None)
+def customer_active_queue(request: Request, db: Session = Depends(get_db)):
+    customer = optional_customer(request, db)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Customer login required")
+    entry = db.scalar(
+        select(QueueEntry)
+        .options(joinedload(QueueEntry.service), joinedload(QueueEntry.barber))
+        .where(
+            QueueEntry.customer_id == customer.id,
+            QueueEntry.source == "online",
+            QueueEntry.status.in_((QueueStatus.WAITING, QueueStatus.SERVING, QueueStatus.SKIPPED)),
+        )
+        .order_by(QueueEntry.joined_at.desc(), QueueEntry.id.desc())
+    )
+    return queue_view(db, entry) if entry else None
+
+
+@app.get("/api/customer-auth/history")
+def customer_history(request: Request, db: Session = Depends(get_db)):
+    customer = optional_customer(request, db)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Customer login required")
+    entries = list(db.scalars(select(QueueEntry).options(joinedload(QueueEntry.shop), joinedload(QueueEntry.service), joinedload(QueueEntry.barber), joinedload(QueueEntry.appointment)).where(QueueEntry.customer_id == customer.id, QueueEntry.status == QueueStatus.COMPLETED)).all())
+    linked_appointment_ids = {entry.appointment_id for entry in entries if entry.appointment_id}
+    appointments = list(db.scalars(select(Appointment).options(joinedload(Appointment.shop), joinedload(Appointment.service), joinedload(Appointment.barber)).where(Appointment.customer_id == customer.id, Appointment.status == "completed")).all())
+    rated_queue_ids = set(db.scalars(select(Rating.queue_entry_id).where(Rating.queue_entry_id.is_not(None))).all())
+    rated_appointment_ids = set(db.scalars(select(Rating.appointment_id).where(Rating.appointment_id.is_not(None))).all())
+    rows = [{"token": (f"B{(entry.appointment.daily_booking_number or entry.appointment.id):02d}" if entry.appointment_id else f"A{(entry.daily_token_number or entry.id):02d}"), "public_token": entry.public_token, "rating_type": "queue", "rated": entry.id in rated_queue_ids or entry.appointment_id in rated_appointment_ids, "shop_id": entry.shop_id, "service_id": entry.service_id, "service_ids": entry.service_ids or (entry.appointment.service_ids if entry.appointment else ([entry.service_id] if entry.service_id else [])), "barber_id": entry.barber_id, "shop": entry.shop.name, "service": entry.service_names or (entry.appointment.service_names if entry.appointment else entry.service.name if entry.service else "Service not assigned"), "barber": entry.barber.name if entry.barber else "Not assigned", "date": entry.completed_at or entry.joined_at, "price_rupees": entry.total_price_rupees if entry.total_price_rupees is not None else entry.appointment.total_price_rupees if entry.appointment else entry.service.price_rupees if entry.service else 0} for entry in entries]
+    rows += [{"token": f"B{(item.daily_booking_number or item.id):02d}", "public_token": item.public_token, "rating_type": "appointment", "rated": item.id in rated_appointment_ids, "shop_id": item.shop_id, "service_id": item.service_id, "service_ids": item.service_ids or [item.service_id], "barber_id": item.barber_id, "shop": item.shop.name, "service": item.service_names or item.service.name, "barber": item.barber.name if item.barber else "Not assigned", "date": item.scheduled_at, "price_rupees": item.total_price_rupees if item.total_price_rupees is not None else item.service.price_rupees} for item in appointments if item.id not in linked_appointment_ids]
+    return sorted(rows, key=lambda row: row["date"], reverse=True)[:50]
+
+
 @app.post("/api/auth/forgot-password")
 def forgot_password(payload: ForgotPasswordRequest, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     identifier = payload.identifier.strip().lower()
@@ -520,7 +583,7 @@ def get_shop(shop_id: int, db: Session = Depends(get_db)):
     waiting = [item for item in active_queue(db, shop_id) if item.status == QueueStatus.WAITING]
     waits = estimated_waits(db, shop_id)
     ratings = [item.stars for item in shop.ratings]
-    return {"id": shop.id, "name": shop.name, "address": shop.address, "phone": shop.phone, "gst_number": shop.gst_number, "slug": shop.slug, "latitude": shop.latitude, "longitude": shop.longitude, "approval_status": shop.approval_status, "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0, "timezone": shop.timezone, "opens_at": shop.opens_at, "closes_at": shop.closes_at, "queue_paused": shop.queue_paused, "photo_url": shop.photo_url, "waiting_count": len(waiting), "estimated_wait_minutes": max(waits.values(), default=0), "services": [item for item in shop.services if item.is_active], "barbers": [item for item in shop.barbers if item.is_active]}
+    return {"id": shop.id, "name": shop.name, "address": shop.address, "phone": shop.phone, "gst_number": shop.gst_number, "slug": shop.slug, "latitude": shop.latitude, "longitude": shop.longitude, "approval_status": shop.approval_status, "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0, "rating_count": len(ratings), "timezone": shop.timezone, "opens_at": shop.opens_at, "closes_at": shop.closes_at, "queue_paused": shop.queue_paused, "photo_url": shop.photo_url, "waiting_count": len(waiting), "estimated_wait_minutes": max(waits.values(), default=0), "services": [item for item in shop.services if item.is_active], "barbers": [item for item in shop.barbers if item.is_active]}
 
 
 @app.get("/api/shops", response_model=list[ShopOut])
@@ -529,11 +592,17 @@ def list_shops(db: Session = Depends(get_db)):
     return [get_shop(shop_id, db) for shop_id in shop_ids]
 
 
+@app.get("/api/feedback")
+def public_feedback(db: Session = Depends(get_db)):
+    items = db.scalars(select(Rating).options(joinedload(Rating.shop)).where(Rating.comment.is_not(None), Rating.comment != "").order_by(Rating.created_at.desc()).limit(10)).all()
+    return [{"shop_name": item.shop.name, "stars": item.stars, "comment": item.comment, "created_at": item.created_at} for item in items]
+
+
 @app.get("/api/shops/{shop_id}/qr")
 def shop_qr(shop_id: int, request: Request, db: Session = Depends(get_db)):
     if db.get(Shop, shop_id) is None:
         raise HTTPException(status_code=404, detail="Shop not found")
-    customer_url = str(request.base_url).rstrip("/") + f"/?shop={shop_id}"
+    customer_url = str(request.base_url).rstrip("/") + f"/customer?shop={shop_id}"
     image = qrcode.make(customer_url)
     output = BytesIO()
     image.save(output, format="PNG")
@@ -735,17 +804,60 @@ def get_queue(shop_id: int, staff: StaffUser = Depends(current_staff), db: Sessi
 
 
 @app.post("/api/shops/{shop_id}/queue", response_model=QueueEntryOut, status_code=201)
-async def join_queue(shop_id: int, payload: QueueJoin, db: Session = Depends(get_db)):
-    shop = db.get(Shop, shop_id)
-    service = db.get(Service, payload.service_id)
-    if shop is None or service is None or service.shop_id != shop_id:
+async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Session = Depends(get_db)):
+    # Serialize joins for this shop so two simultaneous requests cannot receive
+    # the same shop-local daily token number.
+    shop = db.scalar(select(Shop).where(Shop.id == shop_id).with_for_update())
+    service = db.get(Service, payload.service_id) if payload.service_id else None
+    if shop is None or (service is not None and (service.shop_id != shop_id or not service.is_active)):
         raise HTTPException(status_code=404, detail="Shop or service not found")
+    if payload.source == "walk_in" and service is None:
+        raise HTTPException(status_code=400, detail="Choose a service for the walk-in customer")
     if shop.queue_paused:
         raise HTTPException(status_code=409, detail="This shop has temporarily paused new queue entries")
     barber = db.get(Barber, payload.barber_id) if payload.barber_id else None
     if barber and (barber.shop_id != shop_id or not barber.is_active):
         raise HTTPException(status_code=400, detail="Selected barber is unavailable")
-    entry = QueueEntry(shop_id=shop_id, service_id=service.id, barber_id=barber.id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, email=str(payload.email).lower() if payload.email else None, source=payload.source)
+    customer = optional_customer(request, db)
+    try:
+        shop_timezone = ZoneInfo(shop.timezone)
+    except ZoneInfoNotFoundError:
+        shop_timezone = ZoneInfo("Asia/Kolkata")
+    local_now = datetime.now(shop_timezone)
+    queue_day = local_now.date()
+    next_token_number = (db.scalar(select(func.max(QueueEntry.daily_token_number)).where(
+        QueueEntry.shop_id == shop_id, QueueEntry.queue_day == queue_day
+    )) or 0) + 1
+    identity_filters = []
+    if customer:
+        # Lock the verified customer row so simultaneous requests cannot bypass the limit.
+        db.execute(select(CustomerUser.id).where(CustomerUser.id == customer.id).with_for_update()).scalar_one()
+        identity_filters.append(QueueEntry.customer_id == customer.id)
+        if customer.phone:
+            identity_filters.append(QueueEntry.phone == customer.phone)
+        if customer.email:
+            identity_filters.append(func.lower(QueueEntry.email) == customer.email.lower())
+    else:
+        if payload.phone:
+            identity_filters.append(QueueEntry.phone == payload.phone)
+        if payload.email:
+            identity_filters.append(func.lower(QueueEntry.email) == str(payload.email).lower())
+    if payload.source == "online" and identity_filters:
+        local_day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start_utc = local_day_start.astimezone(timezone.utc)
+        next_day_start_utc = (local_day_start + timedelta(days=1)).astimezone(timezone.utc)
+        daily_join_count = db.scalar(
+            select(func.count(QueueEntry.id)).where(
+                QueueEntry.source == "online",
+                QueueEntry.joined_at >= day_start_utc,
+                QueueEntry.joined_at < next_day_start_utc,
+                QueueEntry.status != QueueStatus.COMPLETED,
+                or_(*identity_filters),
+            )
+        ) or 0
+        if daily_join_count >= 3:
+            raise HTTPException(status_code=409, detail="You already have three non-completed live-queue joins today. Complete an active service or try again tomorrow before joining another queue with the same customer account, phone number, or email address.")
+    entry = QueueEntry(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id if service else None, service_ids=[service.id] if service else [], service_names=service.name if service else None, total_duration_minutes=service.duration_minutes if service else None, total_price_rupees=service.price_rupees if service else None, barber_id=barber.id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, email=str(payload.email).lower() if payload.email else None, source=payload.source, queue_day=queue_day, daily_token_number=next_token_number)
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -802,22 +914,49 @@ async def update_queue_entry(entry_id: int, payload: StaffAction, staff: StaffUs
             raise HTTPException(status_code=400, detail="Selected barber is unavailable")
         entry.barber_id = barber.id
         entry.barber = barber
-    transitions = {"start": QueueStatus.SERVING, "complete": QueueStatus.COMPLETED, "skip": QueueStatus.SKIPPED, "cancel": QueueStatus.CANCELLED, "restore": QueueStatus.WAITING}
+    if payload.service_ids and entry.source != "appointment":
+        service_ids = list(dict.fromkeys(payload.service_ids))
+        services = list(db.scalars(select(Service).where(Service.id.in_(service_ids))).all()) if service_ids else []
+        services_by_id = {service.id: service for service in services}
+        services = [services_by_id[service_id] for service_id in service_ids if service_id in services_by_id]
+        if not services or len(services) != len(service_ids) or any(service.shop_id != entry.shop_id or not service.is_active for service in services):
+            raise HTTPException(status_code=400, detail="Choose at least one available service")
+        entry.service_id = services[0].id
+        entry.service_ids = service_ids
+        entry.service_names = ", ".join(service.name for service in services)
+        entry.total_duration_minutes = sum(service.duration_minutes for service in services)
+        entry.total_price_rupees = sum(service.price_rupees for service in services)
+        entry.service = services[0]
+    elif payload.service_id and entry.source != "appointment":
+        service = db.get(Service, payload.service_id)
+        if service is None or service.shop_id != entry.shop_id or not service.is_active:
+            raise HTTPException(status_code=400, detail="Selected service is unavailable")
+        entry.service_id, entry.service_ids, entry.service_names = service.id, [service.id], service.name
+        entry.total_duration_minutes, entry.total_price_rupees, entry.service = service.duration_minutes, service.price_rupees, service
+    transitions = {"start": QueueStatus.SERVING, "complete": QueueStatus.COMPLETED, "skip": QueueStatus.WAITING, "cancel": QueueStatus.CANCELLED, "restore": QueueStatus.WAITING}
     entry.status = transitions[payload.action]
     now = datetime.now(timezone.utc)
     if payload.action == "start":
-        if not entry.barber_id:
-            raise HTTPException(status_code=400, detail="Assign a barber before starting")
+        service_missing = not entry.service_ids
+        barber_missing = not entry.barber_id
+        if service_missing and barber_missing:
+            raise HTTPException(status_code=400, detail="Please choose a service and assign a barber before starting")
+        if service_missing:
+            raise HTTPException(status_code=400, detail="Please choose at least one service before starting")
+        if barber_missing:
+            raise HTTPException(status_code=400, detail="Please assign a barber before starting")
         if not payload.barber_id:
             db.scalar(select(Barber).where(Barber.id == entry.barber_id).with_for_update())
         busy = db.scalar(select(QueueEntry.id).where(QueueEntry.barber_id == entry.barber_id, QueueEntry.status == QueueStatus.SERVING, QueueEntry.id != entry.id))
         if busy:
-            raise HTTPException(status_code=409, detail="This barber is already serving another customer")
+            raise HTTPException(status_code=409, detail="This barber is already serving another customer. Please choose a different barber or wait until this barber is free.")
         entry.started_at = now
     if payload.action == "complete":
         entry.completed_at = now
-    if payload.action == "restore":
+    if payload.action in ("skip", "restore"):
         entry.joined_at = now
+        if payload.action == "skip":
+            entry.priority_active = False
         entry.two_ahead_notified_at = None
         entry.next_notified_at = None
     if entry.appointment_id and payload.action in ("complete", "cancel"):
@@ -940,13 +1079,71 @@ def nearby_shops(latitude: float, longitude: float, radius_km: float = 10, db: S
     return [get_shop(shop_id, db) for km, shop_id in matches if km <= radius_km]
 
 
-@app.post("/api/shops/{shop_id}/appointments", response_model=AppointmentOut, status_code=201)
-async def create_appointment(shop_id: int, payload: AppointmentCreate, db: Session = Depends(get_db)):
+def appointment_interval(item: Appointment) -> tuple[datetime, datetime]:
+    start = item.scheduled_at if item.scheduled_at.tzinfo else item.scheduled_at.replace(tzinfo=timezone.utc)
+    return start, start + timedelta(minutes=appointment_duration(item))
+
+
+def available_barbers_for_slot(db: Session, shop_id: int, start: datetime, duration_minutes: int) -> list[Barber]:
+    end = start + timedelta(minutes=duration_minutes)
+    barbers = list(db.scalars(select(Barber).where(Barber.shop_id == shop_id, Barber.is_active.is_(True)).order_by(Barber.id)).all())
+    appointments = list(db.scalars(select(Appointment).options(joinedload(Appointment.service)).where(Appointment.shop_id == shop_id, Appointment.status.in_(("booked", "confirmed", "queued", "serving")))).all())
+    busy_ids = set()
+    for item in appointments:
+        existing_start, existing_end = appointment_interval(item)
+        if item.barber_id and existing_start < end and start < existing_end:
+            busy_ids.add(item.barber_id)
+    return [barber for barber in barbers if barber.id not in busy_ids]
+
+
+@app.get("/api/shops/{shop_id}/appointment-slots")
+def appointment_slots(shop_id: int, appointment_date: date, service_ids: list[int] = Query(default=[]), service_id: int | None = None, barber_id: int | None = None, db: Session = Depends(get_db)):
     shop = db.get(Shop, shop_id)
-    service = db.get(Service, payload.service_id)
-    barber = db.get(Barber, payload.barber_id) if payload.barber_id else None
-    if shop is None or shop.approval_status != "approved" or service is None or service.shop_id != shop_id or not service.is_active:
+    unique_service_ids = list(dict.fromkeys(service_ids or ([service_id] if service_id else [])))
+    services = list(db.scalars(select(Service).where(Service.id.in_(unique_service_ids))).all()) if unique_service_ids else []
+    barber = db.get(Barber, barber_id) if barber_id else None
+    if shop is None or len(services) != len(unique_service_ids) or any(service.shop_id != shop_id or not service.is_active for service in services):
         raise HTTPException(status_code=404, detail="Shop or service is unavailable")
+    duration_minutes = sum(service.duration_minutes for service in services)
+    if barber and (barber.shop_id != shop_id or not barber.is_active):
+        raise HTTPException(status_code=400, detail="Selected barber is unavailable")
+    try:
+        shop_timezone = ZoneInfo(shop.timezone)
+    except ZoneInfoNotFoundError:
+        shop_timezone = timezone.utc
+    opening = datetime.combine(appointment_date, dt_time.fromisoformat(shop.opens_at), tzinfo=shop_timezone)
+    closing = datetime.combine(appointment_date, dt_time.fromisoformat(shop.closes_at), tzinfo=shop_timezone)
+    if closing <= opening:
+        closing += timedelta(days=1)
+    now = datetime.now(timezone.utc)
+    slots = []
+    cursor = opening
+    step = timedelta(minutes=duration_minutes)
+    while cursor + step <= closing:
+        cursor_utc = cursor.astimezone(timezone.utc)
+        available = available_barbers_for_slot(db, shop_id, cursor_utc, duration_minutes)
+        if cursor_utc > now and (barber in available if barber else bool(available)):
+            slots.append({"value": cursor.isoformat(), "label": cursor.strftime("%I:%M %p"), "available_barbers": len(available)})
+        cursor += step
+    return {"date": appointment_date.isoformat(), "service_duration_minutes": duration_minutes, "slots": slots}
+
+
+@app.post("/api/shops/{shop_id}/appointments", response_model=AppointmentOut, status_code=201)
+async def create_appointment(shop_id: int, payload: AppointmentCreate, request: Request, db: Session = Depends(get_db)):
+    # Serialize appointment creation per shop so each service date receives a
+    # collision-free B01, B02... sequence.
+    shop = db.scalar(select(Shop).where(Shop.id == shop_id).with_for_update())
+    service_ids = list(dict.fromkeys(payload.service_ids or ([payload.service_id] if payload.service_id else [])))
+    services = list(db.scalars(select(Service).where(Service.id.in_(service_ids))).all()) if service_ids else []
+    services_by_id = {service.id: service for service in services}
+    services = [services_by_id[service_id] for service_id in service_ids if service_id in services_by_id]
+    service = services[0] if services else None
+    barber = db.get(Barber, payload.barber_id) if payload.barber_id else None
+    if shop is None or shop.approval_status != "approved" or len(services) != len(service_ids) or not services or any(item.shop_id != shop_id or not item.is_active for item in services):
+        raise HTTPException(status_code=404, detail="Shop or service is unavailable")
+    total_duration = sum(item.duration_minutes for item in services)
+    total_price = sum(item.price_rupees for item in services)
+    service_names = ", ".join(item.name for item in services)
     if payload.scheduled_at.tzinfo is None or payload.scheduled_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Appointment must be in the future")
     try:
@@ -954,23 +1151,34 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, db: Sessi
     except ZoneInfoNotFoundError:
         shop_timezone = timezone.utc
     local_appointment = payload.scheduled_at.astimezone(shop_timezone)
+    booking_day = local_appointment.date()
+    next_booking_number = (db.scalar(select(func.max(Appointment.daily_booking_number)).where(
+        Appointment.shop_id == shop_id, Appointment.booking_day == booking_day
+    )) or 0) + 1
     opening_time = dt_time.fromisoformat(shop.opens_at)
     closing_time = dt_time.fromisoformat(shop.closes_at)
-    appointment_time = local_appointment.time().replace(tzinfo=None)
-    within_hours = opening_time <= appointment_time < closing_time if opening_time < closing_time else appointment_time >= opening_time or appointment_time < closing_time
+    opening_at = datetime.combine(local_appointment.date(), opening_time, tzinfo=shop_timezone)
+    closing_at = datetime.combine(local_appointment.date(), closing_time, tzinfo=shop_timezone)
+    if closing_at <= opening_at:
+        closing_at += timedelta(days=1)
+        if local_appointment < opening_at:
+            opening_at -= timedelta(days=1)
+            closing_at -= timedelta(days=1)
+    service_finishes_at = local_appointment + timedelta(minutes=total_duration)
+    within_hours = opening_at <= local_appointment and service_finishes_at <= closing_at
     if not within_hours:
         raise HTTPException(status_code=409, detail=f"Please select an appointment during shop opening hours: {shop.opens_at} to {shop.closes_at} ({shop.timezone}).")
     if barber and (barber.shop_id != shop_id or not barber.is_active):
         raise HTTPException(status_code=400, detail="Selected barber is unavailable")
-    booked_barber_ids = set(db.scalars(select(Appointment.barber_id).where(Appointment.shop_id == shop_id, Appointment.scheduled_at == payload.scheduled_at, Appointment.status.in_(("booked", "confirmed", "serving")), Appointment.barber_id.is_not(None))).all())
-    if barber and barber.id in booked_barber_ids:
-        raise HTTPException(status_code=409, detail=f"{barber.name} already has an appointment at this time. Choose another barber or time.")
+    available = available_barbers_for_slot(db, shop_id, payload.scheduled_at.astimezone(timezone.utc), total_duration)
+    if barber and barber not in available:
+        raise HTTPException(status_code=409, detail=f"{barber.name} is unavailable for the full {total_duration}-minute booking. Choose another barber or slot.")
     if barber is None:
-        available = db.scalar(select(Barber).where(Barber.shop_id == shop_id, Barber.is_active.is_(True), Barber.id.not_in(booked_barber_ids)).order_by(Barber.id))
-        if available is None:
-            raise HTTPException(status_code=409, detail="All barbers already have an appointment at this time. Choose another time.")
-        barber = available
-    item = Appointment(shop_id=shop_id, service_id=service.id, barber_id=barber.id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, scheduled_at=payload.scheduled_at)
+        if not available:
+            raise HTTPException(status_code=409, detail="All barbers are busy during this service slot. Choose another time.")
+        barber = available[0]
+    customer = optional_customer(request, db)
+    item = Appointment(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id, service_ids=service_ids, service_names=service_names, total_duration_minutes=total_duration, total_price_rupees=total_price, barber_id=barber.id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, scheduled_at=payload.scheduled_at.astimezone(timezone.utc), booking_day=booking_day, daily_booking_number=next_booking_number)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -1008,9 +1216,19 @@ async def cancel_customer_appointment(payload: CustomerAction, db: Session = Dep
 @app.get("/api/shops/{shop_id}/appointments", response_model=list[AppointmentOut])
 def staff_appointments(shop_id: int, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
     require_shop(staff, shop_id)
+    shop = db.get(Shop, shop_id)
+    if shop is None:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    try:
+        shop_timezone = ZoneInfo(shop.timezone)
+    except ZoneInfoNotFoundError:
+        shop_timezone = ZoneInfo("Asia/Kolkata")
+    local_now = datetime.now(shop_timezone)
+    today_start_utc = local_now.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
     statement = select(Appointment).options(joinedload(Appointment.service), joinedload(Appointment.barber)).where(
         Appointment.shop_id == shop_id,
         Appointment.status.not_in(("cancelled", "completed")),
+        Appointment.scheduled_at >= today_start_utc,
     )
     if staff.role == "barber":
         if staff.barber_id is None:
@@ -1045,67 +1263,101 @@ async def update_appointment(appointment_id: int, payload: AppointmentAction, st
 
 @app.post("/api/ratings", status_code=201)
 def create_rating(payload: RatingCreate, db: Session = Depends(get_db)):
-    entry = db.scalar(select(QueueEntry).where(QueueEntry.public_token == payload.queue_public_token))
-    if entry is None or entry.status != QueueStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="Only completed customers can rate this shop")
-    if db.scalar(select(Rating.id).where(Rating.queue_entry_id == entry.id)):
-        raise HTTPException(status_code=409, detail="This visit has already been rated")
-    if entry.barber_id is None:
-        raise HTTPException(status_code=400, detail="A barber must be assigned before this service can be rated")
-    db.add(Rating(shop_id=entry.shop_id, queue_entry_id=entry.id, barber_id=entry.barber_id, stars=payload.stars, comment=payload.comment, barber_stars=payload.barber_stars, barber_comment=payload.barber_comment))
+    entry = db.scalar(select(QueueEntry).where(QueueEntry.public_token == payload.queue_public_token)) if payload.queue_public_token else None
+    appointment = db.scalar(select(Appointment).where(Appointment.public_token == payload.appointment_public_token)) if payload.appointment_public_token else None
+    if (entry is None) == (appointment is None):
+        raise HTTPException(status_code=400, detail="Provide one completed queue visit or appointment")
+    visit = entry or appointment
+    if visit.status != (QueueStatus.COMPLETED if entry else "completed"):
+        raise HTTPException(status_code=400, detail="Only completed services can be rated")
+    duplicate_filters = [Rating.queue_entry_id == entry.id] if entry else [Rating.appointment_id == appointment.id]
+    if entry and entry.appointment_id:
+        duplicate_filters.append(Rating.appointment_id == entry.appointment_id)
+    if appointment:
+        linked_entry_id = db.scalar(select(QueueEntry.id).where(QueueEntry.appointment_id == appointment.id))
+        if linked_entry_id:
+            duplicate_filters.append(Rating.queue_entry_id == linked_entry_id)
+    if db.scalar(select(Rating.id).where(or_(*duplicate_filters))):
+        raise HTTPException(status_code=409, detail="This service has already been rated")
+    # A single customer score updates the shop and the assigned barber.
+    barber_stars = (payload.barber_stars or payload.stars) if visit.barber_id else None
+    barber_comment = payload.barber_comment if visit.barber_id else None
+    db.add(Rating(shop_id=visit.shop_id, queue_entry_id=entry.id if entry else None, appointment_id=appointment.id if appointment else None, barber_id=visit.barber_id, stars=payload.stars, comment=payload.comment, barber_stars=barber_stars, barber_comment=barber_comment))
     db.commit()
     return {"rated": True}
 
 
 @app.get("/api/shops/{shop_id}/analytics")
-def shop_analytics(shop_id: int, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+def shop_analytics(shop_id: int, start_date: date | None = None, end_date: date | None = None, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
     require_shop(staff, shop_id)
     shop = db.get(Shop, shop_id)
     entries = list(db.scalars(select(QueueEntry).where(QueueEntry.shop_id == shop_id)).all())
     appointments = list(db.scalars(select(Appointment).where(Appointment.shop_id == shop_id)).all())
-    cancelled_appointments = [item for item in appointments if item.status == "cancelled"]
-    completed = [item for item in entries if item.status == QueueStatus.COMPLETED]
-    completed_appointments = [item for item in appointments if item.status == "completed"]
-    revenue = sum(db.get(Service, item.service_id).price_rupees for item in completed + completed_appointments)
+    try:
+        shop_timezone = ZoneInfo(shop.timezone)
+    except ZoneInfoNotFoundError:
+        shop_timezone = timezone.utc
+    today = datetime.now(shop_timezone).date()
+    range_start, range_end = start_date or today, end_date or today
+    if range_end < range_start:
+        raise HTTPException(status_code=422, detail="End date must be on or after start date")
+    def local_date(value: datetime | None) -> date | None:
+        if value is None:
+            return None
+        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return aware.astimezone(shop_timezone).date()
+    def in_range(value: datetime | None) -> bool:
+        value_date = local_date(value)
+        return value_date is not None and range_start <= value_date <= range_end
+    range_entries = [item for item in entries if in_range(item.completed_at or item.joined_at)]
+    range_appointments = [item for item in appointments if in_range(item.scheduled_at)]
+    cancelled_appointments = [item for item in range_appointments if item.status == "cancelled"]
+    completed = [item for item in entries if item.status == QueueStatus.COMPLETED and in_range(item.completed_at)]
+    linked_appointment_ids = {item.appointment_id for item in completed if item.appointment_id}
+    completed_appointments = [item for item in range_appointments if item.status == "completed" and item.id not in linked_appointment_ids]
+    def queue_entry_price(item: QueueEntry) -> int:
+        if item.total_price_rupees is not None:
+            return item.total_price_rupees
+        if item.appointment and item.appointment.total_price_rupees is not None:
+            return item.appointment.total_price_rupees
+        service = db.get(Service, item.service_id) if item.service_id else None
+        return service.price_rupees if service else 0
+    def appointment_price(item: Appointment) -> int:
+        return item.total_price_rupees if item.total_price_rupees is not None else db.get(Service, item.service_id).price_rupees
+    revenue = sum(queue_entry_price(item) for item in completed) + sum(appointment_price(item) for item in completed_appointments)
     barber_rows = []
     barbers = list(db.scalars(select(Barber).where(Barber.shop_id == shop_id).order_by(Barber.name)).all())
     for barber in barbers:
         barber_entries = [item for item in entries if item.barber_id == barber.id]
         barber_completed = [item for item in barber_entries if item.status == QueueStatus.COMPLETED]
+        barber_completed = [item for item in barber_completed if in_range(item.completed_at)]
         barber_completed_appointments = [item for item in completed_appointments if item.barber_id == barber.id]
-        barber_ratings = list(db.scalars(select(Rating).where(Rating.barber_id == barber.id, Rating.barber_stars.is_not(None))).all())
+        barber_ratings = [item for item in db.scalars(select(Rating).where(Rating.barber_id == barber.id, Rating.barber_stars.is_not(None))).all() if in_range(item.created_at)]
         barber_rows.append({
             "barber_id": barber.id,
             "barber_name": barber.name,
             "waiting": sum(item.status == QueueStatus.WAITING for item in barber_entries),
             "serving": sum(item.status == QueueStatus.SERVING for item in barber_entries),
             "completed_services": len(barber_completed) + len(barber_completed_appointments),
-            "appointments": sum(item.barber_id == barber.id for item in appointments),
-            "cancelled_appointments": sum(item.barber_id == barber.id and item.status == "cancelled" for item in appointments),
+            "appointments": sum(item.barber_id == barber.id for item in range_appointments),
+            "cancelled_appointments": sum(item.barber_id == barber.id and item.status == "cancelled" for item in range_appointments),
             "average_rating": round(sum(item.barber_stars for item in barber_ratings) / len(barber_ratings), 1) if barber_ratings else 0,
             "review_count": len(barber_ratings),
-            "estimated_revenue_rupees": sum(db.get(Service, item.service_id).price_rupees for item in barber_completed + barber_completed_appointments),
+            "estimated_revenue_rupees": sum(queue_entry_price(item) for item in barber_completed) + sum(appointment_price(item) for item in barber_completed_appointments),
         })
     if staff.role == "barber":
         barber_rows = [row for row in barber_rows if row["barber_id"] == staff.barber_id]
-    try:
-        shop_timezone = ZoneInfo(shop.timezone)
-    except ZoneInfoNotFoundError:
-        shop_timezone = timezone.utc
-    today = datetime.now(shop_timezone).date()
     barber_names = {barber.id: barber.name for barber in barbers}
-    revenue_records = [(item.barber_id, item.service_id, item.completed_at) for item in completed if item.completed_at]
-    revenue_records += [(item.barber_id, item.service_id, item.scheduled_at) for item in completed_appointments]
+    revenue_records = [(item.barber_id, queue_entry_price(item), item.completed_at) for item in completed if item.completed_at]
+    revenue_records += [(item.barber_id, appointment_price(item), item.scheduled_at) for item in completed_appointments]
     if staff.role == "barber":
         revenue_records = [record for record in revenue_records if record[0] == staff.barber_id]
     daily: dict[str, dict] = {}
-    for barber_id, service_id, occurred_at in revenue_records:
-        aware_time = occurred_at if occurred_at.tzinfo else occurred_at.replace(tzinfo=timezone.utc)
-        local_date = aware_time.astimezone(shop_timezone).date()
-        if local_date.year != today.year or local_date.month != today.month:
+    for barber_id, amount, occurred_at in revenue_records:
+        occurred_date = local_date(occurred_at)
+        if occurred_date is None or not range_start <= occurred_date <= range_end:
             continue
-        date_key = local_date.isoformat()
-        amount = db.get(Service, service_id).price_rupees
+        date_key = occurred_date.isoformat()
         row = daily.setdefault(date_key, {"date": date_key, "total_revenue_rupees": 0, "barbers": {}})
         row["total_revenue_rupees"] += amount
         if barber_id:
@@ -1115,10 +1367,9 @@ def shop_analytics(shop_id: int, staff: StaffUser = Depends(current_staff), db: 
     for row in sorted(daily.values(), key=lambda item: item["date"], reverse=True):
         row["barbers"] = sorted(row["barbers"].values(), key=lambda item: item["barber_name"])
         daily_rows.append(row)
-    today_key = today.isoformat()
-    today_revenue = daily.get(today_key, {}).get("total_revenue_rupees", 0)
+    today_revenue = daily.get(today.isoformat(), {}).get("total_revenue_rupees", 0)
     month_revenue = sum(row["total_revenue_rupees"] for row in daily.values())
-    return {"total_queue_entries": len(entries), "completed_services": len(completed) + len(completed_appointments), "appointments": len(appointments), "cancelled_appointments": len(cancelled_appointments), "estimated_revenue_rupees": revenue, "today_revenue_rupees": today_revenue, "month_revenue_rupees": month_revenue, "daily_revenue": daily_rows, "barbers": barber_rows}
+    return {"range_start": range_start, "range_end": range_end, "total_queue_entries": len(range_entries), "completed_services": len(completed) + len(completed_appointments), "appointments": len(range_appointments), "cancelled_appointments": len(cancelled_appointments), "estimated_revenue_rupees": revenue, "today_revenue_rupees": today_revenue, "month_revenue_rupees": month_revenue, "daily_revenue": daily_rows, "barbers": barber_rows}
 
 
 @app.websocket("/ws/shops/{shop_id}")

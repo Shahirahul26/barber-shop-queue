@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TrimTime helps customers avoid barber shop waiting rooms and helps shop teams run live queues, appointments and daily operations." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/landing.css?v=2" />
+  <title>TrimTime · Skip the wait. Keep every chair moving.</title>
+</head>
+<body>
+  <header class="site-header">
+    <a class="landing-brand" href="/" aria-label="TrimTime home"><span class="brand-mark">T</span><span class="brand-name">TrimTime</span></a>
+    <nav aria-label="Landing page"><a href="#how-it-works">How it works</a><a href="#features">Features</a><a href="#vision">Our vision</a><a href="#feedback">Feedback</a></nav>
+    <a class="header-cta" href="#access">Get started</a>
+  </header>
+
+  <main>
+    <section class="landing-hero">
+      <div class="hero-copy">
+        <p class="landing-kicker"><span></span> A calmer way to run barber shops</p>
+        <h1>Great cuts.<br /><em>Less waiting.</em></h1>
+        <p class="hero-lede">Join a live queue from your phone, book the right time, and arrive when your chair is nearly ready. Shop teams get one clear workspace for customers, barbers and revenue.</p>
+        <div id="access" class="access-card">
+          <div class="access-toggle" role="tablist" aria-label="Choose how to continue">
+            <button type="button" class="active" data-access="customer" role="tab" aria-selected="true">I’m a customer</button>
+            <button type="button" data-access="staff" role="tab" aria-selected="false">I run a shop</button>
+          </div>
+          <p id="access-description">Find nearby shops, see the live wait, join a queue or book a time.</p>
+          <div class="access-actions">
+            <a id="access-signin" class="primary-cta" href="/customer?auth=signin">Customer sign in <span>→</span></a>
+            <a id="access-signup" class="access-secondary" href="/customer?auth=signup">New customer? Sign up</a>
+          </div>
+        </div>
+        <div class="hero-proof"><span>QR-first access</span><span>Live queue updates</span><span>No app download</span></div>
+      </div>
+
+      <div class="hero-product" aria-label="TrimTime live queue preview">
+        <div class="ambient-orb"></div>
+        <div class="phone-shell">
+          <div class="phone-top"><span>9:41</span><i></i><span>●●●</span></div>
+          <div class="phone-screen">
+            <div class="mini-brand"><span class="brand-mark">T</span><strong>TrimTime</strong></div>
+            <p class="preview-label">YOUR LIVE TICKET</p>
+            <div class="preview-token"><div><small>Token</small><strong>A24</strong></div><span>Waiting</span></div>
+            <div class="preview-shop"><div class="shop-avatar">BB</div><div><strong>Blade & Bloom</strong><small>Classic haircut · Vikram</small></div></div>
+            <div class="preview-stats"><div><strong>2</strong><span>people ahead</span></div><div><strong>18</strong><span>minutes</span></div></div>
+            <div class="progress-track"><span></span></div>
+            <p class="next-message"><i></i> You’re almost next. Time to head over.</p>
+          </div>
+        </div>
+        <div class="floating-note note-one"><span>✓</span><div><strong>Appointment confirmed</strong><small>10:30 AM · Hair + beard</small></div></div>
+        <div class="floating-note note-two"><span>↗</span><div><strong>Queue moving</strong><small>Only two customers left</small></div></div>
+      </div>
+    </section>
+
+    <section class="impact-strip" aria-label="Product benefits">
+      <p>One queue. Every chair. A better day for everyone.</p>
+      <div><span>01</span> Scan</div><div><span>02</span> Choose</div><div><span>03</span> Join</div><div><span>04</span> Arrive</div>
+    </section>
+
+    <section id="how-it-works" class="landing-section story-section">
+      <div class="section-intro"><p class="landing-kicker">HOW IT WORKS</p><h2>From QR scan to the barber’s chair.</h2><p>No uncertain waiting room. No repeated “how long?” calls. TrimTime keeps both sides looking at the same live plan.</p></div>
+      <div class="journey-grid">
+        <article><span>01</span><div class="step-icon">⌁</div><h3>Scan the shop QR</h3><p>Customers open the correct shop instantly on any phone, with no installation required.</p></article>
+        <article><span>02</span><div class="step-icon">✦</div><h3>Pick the service</h3><p>See services, prices, estimated wait and choose a preferred barber when needed.</p></article>
+        <article><span>03</span><div class="step-icon">◎</div><h3>Join or book</h3><p>Enter the live queue now or reserve an available service-length appointment slot.</p></article>
+        <article><span>04</span><div class="step-icon">↗</div><h3>Arrive at the right time</h3><p>Live position updates and alerts help customers return when only two people remain.</p></article>
+      </div>
+    </section>
+
+    <section class="dual-experience">
+      <article class="experience customer-experience"><p class="landing-kicker">FOR CUSTOMERS</p><h2>Your time belongs to you.</h2><ul><li>See nearby shops and real waiting time</li><li>Join a live queue from anywhere</li><li>Book service-length appointment slots</li><li>Track tokens, history and cancellations</li><li>Rate the experience after completion</li></ul><a href="/customer">Find a barber shop <span>→</span></a></article>
+      <article class="experience shop-experience"><p class="landing-kicker">FOR SHOP TEAMS</p><h2>Run the floor without the chaos.</h2><ul><li>Manage walk-ins and priority bookings</li><li>Assign customers to available barbers</li><li>Pause joins, skip, start and complete visits</li><li>Control services, staff and shop QR</li><li>Read barber-wise revenue and ratings</li></ul><a href="/staff">Open staff workspace <span>→</span></a></article>
+    </section>
+
+    <section id="features" class="landing-section feature-section">
+      <div class="section-intro"><p class="landing-kicker">THE COMPLETE WORKFLOW</p><h2>Everything required to move a busy shop forward.</h2></div>
+      <div class="feature-grid">
+        <article class="feature-large"><span class="feature-number">01</span><h3>Live queue intelligence</h3><p>Real-time position, estimated minutes, barber assignment and milestone alerts keep every customer informed.</p><div class="queue-visual"><div><span>A21</span><strong>Serving</strong></div><div><span>A22</span><strong>Next</strong></div><div><span>B14</span><strong>Priority · 10:30</strong></div></div></article>
+        <article><span class="feature-number">02</span><h3>Appointments that respect service time</h3><p>Available slots account for service duration and barber availability before confirming.</p></article>
+        <article><span class="feature-number">03</span><h3>Shop and team control</h3><p>Owners manage services, working hours, staff access, barber profiles and a unique customer QR.</p></article>
+        <article><span class="feature-number">04</span><h3>Reports that answer real questions</h3><p>Generate custom date-range revenue, completion, appointment and barber performance reports.</p></article>
+        <article><span class="feature-number">05</span><h3>Customer history and trust</h3><p>Verified customers retain recent service history and can leave a transparent 1–5 star score.</p></article>
+      </div>
+    </section>
+
+    <section id="vision" class="vision-section">
+      <div><p class="landing-kicker">OUR VISION</p><h2>The waiting room should be a choice, not a requirement.</h2></div>
+      <p>We imagine neighbourhood service businesses where time is visible, capacity is coordinated, and every customer knows when to arrive. TrimTime starts with barber shops: a familiar place where a simple shared queue can make the entire day feel better.</p>
+    </section>
+
+    <section class="founder-section landing-section">
+      <div class="founder-monogram">TT</div>
+      <div><p class="landing-kicker">A NOTE FROM THE FOUNDER</p><blockquote>“TrimTime began with one straightforward question: why should a customer lose an hour just to hold a place in line?”</blockquote><p>The product is being built around a practical promise—give customers their time back while helping local barber shops serve more calmly and consistently. Every feature, from the QR entry point to barber-level reporting, supports that promise.</p><strong>Founder · TrimTime</strong></div>
+    </section>
+
+    <section id="feedback" class="feedback-section landing-section">
+      <div class="section-intro"><p class="landing-kicker">CUSTOMER FEEDBACK</p><h2>What completed customers are saying.</h2></div>
+      <div class="carousel-shell">
+        <button id="feedback-prev" class="carousel-arrow" type="button" aria-label="Previous feedback">←</button>
+        <div id="feedback-track" class="feedback-track" aria-live="polite"><article class="feedback-card"><div class="feedback-stars">★★★★★</div><blockquote>Customer feedback will appear here after a completed service is rated.</blockquote><p>Be the first to share an experience.</p></article></div>
+        <button id="feedback-next" class="carousel-arrow" type="button" aria-label="Next feedback">→</button>
+      </div>
+      <div id="feedback-dots" class="carousel-dots"></div>
+    </section>
+
+    <section class="final-cta">
+      <p class="landing-kicker">READY WHEN YOU ARE</p><h2>Spend less time waiting.<br />Make more time for the work.</h2>
+      <div><a class="primary-cta light" href="/customer">Continue as customer <span>→</span></a><a class="secondary-cta" href="/staff">Staff sign in <span>→</span></a></div>
+    </section>
+  </main>
+
+  <footer class="landing-footer"><a class="landing-brand" href="/"><span class="brand-mark">T</span><span class="brand-name">TrimTime</span></a><p>Live queues and calmer barber shops.</p><div><a href="/terms">Terms</a><a href="/customer">Customer login</a><a href="/staff">Staff login</a></div><small>© <span id="current-year"></span> <span class="brand-name">TrimTime</span></small></footer>
+  <script src="/static/landing.js?v=2" defer></script>
+</body>
+</html>

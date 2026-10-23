@@ -88,7 +88,8 @@ class QueueJoin(BaseModel):
     customer_name: str = Field(min_length=2, max_length=100)
     phone: str | None = Field(default=None, min_length=10, max_length=20, pattern="^[0-9+ -]+$")
     email: EmailStr | None = None
-    service_id: int
+    service_id: int | None = None
+    service_ids: list[int] | None = None
     barber_id: int | None = None
     source: str = Field(default="online", pattern="^(online|walk_in)$")
 
@@ -97,6 +98,9 @@ class QueueEntryOut(BaseModel):
     id: int
     public_token: str
     token: str
+    shop_id: int
+    service_id: int | None
+    service_ids: list[int]
     customer_name: str
     email: EmailStr | None
     service_name: str
@@ -105,7 +109,9 @@ class QueueEntryOut(BaseModel):
     status: QueueStatus
     position: int | None
     people_ahead: int | None
+    ahead_label: str
     estimated_wait_minutes: int
+    availability_message: str | None
     source: str
     joined_at: datetime
 
@@ -121,6 +127,7 @@ class ShopOut(BaseModel):
     longitude: float | None
     approval_status: str
     average_rating: float
+    rating_count: int
     timezone: str
     opens_at: str
     closes_at: str
@@ -192,6 +199,8 @@ class StaffProfileUpdate(BaseModel):
 class StaffAction(BaseModel):
     action: str = Field(pattern="^(start|complete|skip|cancel|restore)$")
     barber_id: int | None = None
+    service_id: int | None = None
+    service_ids: list[int] | None = Field(default=None, max_length=20)
 
 
 class CustomerAction(BaseModel):
@@ -233,7 +242,8 @@ class ApprovalUpdate(BaseModel):
 class AppointmentCreate(BaseModel):
     customer_name: str = Field(min_length=2, max_length=100)
     phone: str | None = Field(default=None, min_length=10, max_length=20, pattern="^[0-9+ -]+$")
-    service_id: int
+    service_id: int | None = None
+    service_ids: list[int] | None = Field(default=None, min_length=1, max_length=20)
     barber_id: int | None = None
     scheduled_at: datetime
 
@@ -243,9 +253,14 @@ class AppointmentOut(BaseModel):
     public_token: str
     token: str
     shop_id: int
+    service_id: int
+    service_ids: list[int]
+    barber_id: int | None
     customer_name: str
     phone: str | None
     service_name: str
+    total_duration_minutes: int
+    total_price_rupees: int
     barber_name: str | None
     scheduled_at: datetime
     status: str
@@ -256,8 +271,9 @@ class AppointmentAction(BaseModel):
 
 
 class RatingCreate(BaseModel):
-    queue_public_token: str
+    queue_public_token: str | None = None
+    appointment_public_token: str | None = None
     stars: int = Field(ge=1, le=5)
     comment: str | None = Field(default=None, max_length=500)
-    barber_stars: int = Field(ge=1, le=5)
+    barber_stars: int | None = Field(default=None, ge=1, le=5)
     barber_comment: str | None = Field(default=None, max_length=500)
