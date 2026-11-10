@@ -1,9 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, case, select
 from sqlalchemy.orm import Session, joinedload
 
-from .models import Barber, QueueEntry, QueueStatus
+from .models import Appointment, Barber, QueueEntry, QueueStatus
 
 
 ACTIVE_STATUSES = (QueueStatus.WAITING, QueueStatus.SERVING)
@@ -43,6 +43,18 @@ def queue_metrics(db: Session, shop_id: int) -> tuple[dict[int, dict], int]:
     workloads = {barber_id: 0 for barber_id in barber_ids}
     customers_before = {barber_id: 0 for barber_id in barber_ids}
     now = datetime.now(timezone.utc)
+    reservations = {barber_id: list(db.scalars(select(Appointment).where(
+        Appointment.barber_id == barber_id, Appointment.status.in_(("booked", "confirmed", "queued")),
+        Appointment.scheduled_at >= now).order_by(Appointment.scheduled_at)).all()) for barber_id in barber_ids}
+
+    def wait_with_reservations(barber_id: int, duration: int) -> int:
+        candidate = now + timedelta(minutes=workloads[barber_id])
+        for appointment in reservations[barber_id]:
+            start = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
+            end = start + timedelta(minutes=appointment.total_duration_minutes)
+            if candidate < end and candidate + timedelta(minutes=duration) > start:
+                candidate = end
+        return max(0, int((candidate - now).total_seconds() // 60))
 
     # Serving customers contribute remaining time, but not a displayed turn.
     for entry in entries:
@@ -68,12 +80,14 @@ def queue_metrics(db: Session, shop_id: int) -> tuple[dict[int, dict], int]:
                                  "message": "Selected barber unavailable - reassignment required"}
             continue
         eligible_ids = [entry.barber_id] if entry.barber_id is not None else barber_ids
-        assigned = min(eligible_ids, key=lambda barber_id: (workloads[barber_id], barber_id))
+        duration = entry_duration(entry)
+        assigned = min(eligible_ids, key=lambda barber_id: (wait_with_reservations(barber_id, duration), barber_id))
         # Any-barber customers display stable FIFO service rounds. Barber-specific
         # customers display only the work queued on their selected barber's lane.
         ahead = waiting_index // len(barber_ids) if entry.barber_id is None else customers_before[assigned]
-        metrics[entry.id] = {"wait": workloads[assigned], "ahead": ahead, "message": None}
-        workloads[assigned] += entry_duration(entry)
+        adjusted_wait = wait_with_reservations(assigned, duration)
+        metrics[entry.id] = {"wait": adjusted_wait, "ahead": ahead, "message": None}
+        workloads[assigned] = adjusted_wait + duration
         customers_before[assigned] += 1
         waiting_index += 1
     return metrics, len(barber_ids)

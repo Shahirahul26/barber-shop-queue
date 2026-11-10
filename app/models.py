@@ -1,8 +1,8 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time as dt_time, timezone
 from enum import Enum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, JSON, String, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -35,7 +35,11 @@ class Shop(Base):
     opens_at: Mapped[str] = mapped_column(String(5), default="09:00")
     closes_at: Mapped[str] = mapped_column(String(5), default="20:00")
     queue_paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    appointments_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     photo_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    appointment_grace_minutes: Mapped[int] = mapped_column(Integer, default=10)
+    cleanup_buffer_minutes: Mapped[int] = mapped_column(Integer, default=0)
+    founding_barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id", use_alter=True), nullable=True)
     services: Mapped[list["Service"]] = relationship(back_populates="shop")
     barbers: Mapped[list["Barber"]] = relationship(back_populates="shop")
     staff: Mapped[list["StaffUser"]] = relationship(back_populates="shop")
@@ -64,6 +68,10 @@ class CustomerUser(Base):
     otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     otp_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     otp_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    mpin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mpin_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mpin_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    mpin_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
@@ -72,6 +80,7 @@ class StaffUser(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True, index=True)
+    barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id"), nullable=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100), default="Shop Owner")
@@ -82,15 +91,125 @@ class StaffUser(Base):
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     password_reset_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     password_reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mpin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mpin_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mpin_failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    mpin_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     shop: Mapped[Shop] = relationship(back_populates="staff")
     barber: Mapped["Barber | None"] = relationship()
+
+
+class TrustedDeviceSession(Base):
+    __tablename__ = "trusted_device_sessions"
+    __table_args__ = (
+        UniqueConstraint("customer_id", "device_id", name="uq_customer_trusted_device"),
+        UniqueConstraint("staff_user_id", "device_id", name="uq_staff_trusted_device"),
+        CheckConstraint("(customer_id IS NOT NULL) <> (staff_user_id IS NOT NULL)", name="ck_trusted_device_one_account"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customer_users.id"), nullable=True, index=True)
+    staff_user_id: Mapped[int | None] = mapped_column(ForeignKey("staff_users.id"), nullable=True, index=True)
+    device_id: Mapped[str] = mapped_column(String(64), index=True)
+    device_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BarberProfile(Base):
+    __tablename__ = "barber_profiles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    barber_number: Mapped[str] = mapped_column(String(20), unique=True, index=True)
+    legacy_barber_id: Mapped[int | None] = mapped_column(Integer, unique=True, nullable=True)
+    full_name: Mapped[str] = mapped_column(String(100))
+    photo_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    gender: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    career_started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    biography: Mapped[str | None] = mapped_column(Text, nullable=True)
+    specialities: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    certifications: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ShopBarberMembership(Base):
+    __tablename__ = "barber_shop_memberships"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    barber_profile_id: Mapped[int] = mapped_column(ForeignKey("barber_profiles.id"), index=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
+    role: Mapped[str] = mapped_column(String(30), default="barber")
+    joined_on: Mapped[date] = mapped_column(Date, default=date.today)
+    left_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    commission_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    owner_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transfer_approval_status: Mapped[str] = mapped_column(String(20), default="approved")
+
+
+class BarberServiceAssignment(Base):
+    __tablename__ = "barber_service_assignments"
+    __table_args__ = (UniqueConstraint("membership_id", "service_id", name="uq_barber_membership_service"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("barber_shop_memberships.id"), index=True)
+    service_id: Mapped[int] = mapped_column(ForeignKey("services.id"), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class BarberWeeklyAvailability(Base):
+    __tablename__ = "barber_weekly_availability"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("barber_shop_memberships.id"), index=True)
+    weekday: Mapped[int] = mapped_column(Integer)
+    starts_at: Mapped[dt_time] = mapped_column(Time)
+    ends_at: Mapped[dt_time] = mapped_column(Time)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class BarberAvailabilityException(Base):
+    __tablename__ = "barber_availability_exceptions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("barber_shop_memberships.id"), index=True)
+    exception_type: Mapped[str] = mapped_column(String(30))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    approval_status: Mapped[str] = mapped_column(String(20), default="approved", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class BarberMembershipRequest(Base):
+    __tablename__ = "barber_membership_requests"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    barber_profile_id: Mapped[int] = mapped_column(ForeignKey("barber_profiles.id"), index=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
+    requested_by_id: Mapped[int | None] = mapped_column(ForeignKey("staff_users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    message: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class BarberPortfolioImage(Base):
+    __tablename__ = "barber_portfolio_images"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    barber_profile_id: Mapped[int] = mapped_column(ForeignKey("barber_profiles.id"), index=True)
+    image_url: Mapped[str] = mapped_column(String(300))
+    caption: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Barber(Base):
     __tablename__ = "barbers"
     id: Mapped[int] = mapped_column(primary_key=True)
     shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), index=True)
+    barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id"), nullable=True, index=True)
+    membership_id: Mapped[int | None] = mapped_column(ForeignKey("barber_shop_memberships.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     shop: Mapped[Shop] = relationship(back_populates="barbers")
@@ -122,6 +241,7 @@ class QueueEntry(Base):
     total_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_price_rupees: Mapped[int | None] = mapped_column(Integer, nullable=True)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True)
+    barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id"), nullable=True, index=True)
     customer_name: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -166,6 +286,7 @@ class Appointment(Base):
     total_duration_minutes: Mapped[int] = mapped_column(Integer)
     total_price_rupees: Mapped[int] = mapped_column(Integer)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True)
+    barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id"), nullable=True, index=True)
     customer_name: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
@@ -185,6 +306,7 @@ class Rating(Base):
     queue_entry_id: Mapped[int | None] = mapped_column(ForeignKey("queue_entries.id"), nullable=True, unique=True)
     appointment_id: Mapped[int | None] = mapped_column(ForeignKey("appointments.id"), nullable=True, unique=True)
     barber_id: Mapped[int | None] = mapped_column(ForeignKey("barbers.id"), nullable=True, index=True)
+    barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id"), nullable=True, index=True)
     stars: Mapped[int] = mapped_column(Integer)
     comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
     barber_stars: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -31,6 +31,11 @@ def create_customer_token(customer_id: int) -> str:
     return jwt.encode({"sub": str(customer_id), "type": "customer", "iat": now, "exp": now + timedelta(days=90)}, settings.secret_key, algorithm="HS256")
 
 
+def create_mpin_verification_token(customer_id: int, reset_mpin: bool = False) -> str:
+    now = datetime.now(timezone.utc)
+    return jwt.encode({"sub": str(customer_id), "type": "customer_mpin_verification", "reset_mpin": reset_mpin, "iat": now, "exp": now + timedelta(minutes=15)}, settings.secret_key, algorithm="HS256")
+
+
 def decode_access_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.secret_key, algorithms=["HS256"])

@@ -24,24 +24,81 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from .config import settings, validate_production_settings
 from .email_service import send_customer_otp_email, send_password_reset_email, smtp_is_configured
 from .database import Base, SessionLocal, engine, get_db
-from .models import Appointment, AuditEvent, Barber, CustomerUser, PlatformSetting, PushSubscription, QueueEntry, QueueStatus, Rating, Service, Shop, StaffUser
+from .models import Appointment, AuditEvent, Barber, BarberAvailabilityException, BarberMembershipRequest, BarberPortfolioImage, BarberProfile, BarberServiceAssignment, BarberWeeklyAvailability, CustomerUser, PlatformSetting, PushSubscription, QueueEntry, QueueStatus, Rating, Service, Shop, ShopBarberMembership, StaffUser, TrustedDeviceSession
 from .notifications import notify_queue_milestones
 from .queue_service import active_queue, estimated_waits, queue_view
 from .realtime import manager
 from .schemas import (
-    AdminShopCreate, AppointmentAction, AppointmentCreate, AppointmentOut, ApprovalUpdate, BannerUpdate, CustomerOtpRequest, CustomerOtpVerify, ForgotPasswordRequest, GoogleLoginRequest,
-    BarberCreate, BarberOut, BarberUpdate, CustomerAction, LoginRequest, QueueEntryOut, QueueJoin,
+    AdminShopCreate, AppointmentAction, AppointmentCreate, AppointmentOut, ApprovalUpdate, BannerUpdate, CustomerOtpRequest, CustomerOtpVerify, CustomerMpinComplete, CustomerProfileUpdate, DeviceCheckRequest, ForgotPasswordRequest, GoogleLoginRequest, MpinLoginRequest, MpinSetRequest,
+    AvailabilityExceptionCreate, BarberCreate, BarberInvitationCreate, BarberOut, BarberProfileUpdate, BarberServicesUpdate, BarberUpdate, CustomerAction, LoginRequest, MembershipRequestAction, QueueEntryOut, QueueJoin, ShopAppointmentsFeatureUpdate, WeeklyAvailabilityUpdate,
     PasswordChange, PasswordResetConfirm, PushSubscriptionIn, RatingCreate, ServiceCreate, ServiceOut, ServiceUpdate, ShopOut,
     ShopStateUpdate, ShopUpdate, StaffAction, StaffCreate, StaffOut, StaffPasswordReset,
     StaffProfileUpdate, StaffStatusUpdate, TokenOut,
 )
-from .security import create_access_token, create_customer_token, current_staff, decode_access_token, hash_password, verify_password
+from .security import create_access_token, create_customer_token, create_mpin_verification_token, current_staff, decode_access_token, hash_password, verify_password
+from .scheduling import barber_provides_services, eligible_barbers, next_reservation, scheduled_windows, shop_window, shop_zone
 
 
 STATIC_DIR = Path(__file__).parent / "static"
 UPLOAD_DIR = STATIC_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 DEFAULT_BANNER = {"software_name": "TrimTime", "eyebrow": "TRIMTIME FOR SHOPS", "title": "Less waiting. More great cuts.", "message": "Keep every chair productive while customers follow their queue from anywhere.", "login_image_url": None}
+TRUSTED_DEVICE_DAYS = 90
+MPIN_MAX_ATTEMPTS = 5
+MPIN_LOCK_MINUTES = 15
+
+
+def aware(value: datetime | None) -> datetime | None:
+    return value if value is None or value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def weak_mpin(mpin: str) -> bool:
+    common = {"000000", "111111", "123456", "654321", "121212", "112233", "123123", "101010", "999999"}
+    return mpin in common or len(set(mpin)) == 1
+
+
+def trusted_device(db: Session, *, device_id: str, customer_id: int | None = None, staff_user_id: int | None = None) -> TrustedDeviceSession | None:
+    conditions = [TrustedDeviceSession.device_id == device_id, TrustedDeviceSession.revoked_at.is_(None)]
+    conditions.append(TrustedDeviceSession.customer_id == customer_id if customer_id is not None else TrustedDeviceSession.staff_user_id == staff_user_id)
+    item = db.scalar(select(TrustedDeviceSession).where(*conditions))
+    if item and aware(item.expires_at) > datetime.now(timezone.utc):
+        return item
+    return None
+
+
+def remember_device(db: Session, *, device_id: str, device_name: str | None, customer_id: int | None = None, staff_user_id: int | None = None) -> TrustedDeviceSession:
+    condition = TrustedDeviceSession.customer_id == customer_id if customer_id is not None else TrustedDeviceSession.staff_user_id == staff_user_id
+    item = db.scalar(select(TrustedDeviceSession).where(TrustedDeviceSession.device_id == device_id, condition))
+    now = datetime.now(timezone.utc)
+    if item is None:
+        item = TrustedDeviceSession(device_id=device_id, customer_id=customer_id, staff_user_id=staff_user_id, expires_at=now + timedelta(days=TRUSTED_DEVICE_DAYS))
+        db.add(item)
+    item.device_name = (device_name or "Browser")[:160]
+    item.last_used_at = now
+    item.expires_at = now + timedelta(days=TRUSTED_DEVICE_DAYS)
+    item.revoked_at = None
+    return item
+
+
+def verify_mpin(account: CustomerUser | StaffUser, mpin: str, db: Session) -> None:
+    now = datetime.now(timezone.utc)
+    if aware(account.mpin_locked_until) and aware(account.mpin_locked_until) > now:
+        raise HTTPException(status_code=429, detail="MPIN is temporarily locked. Try again after 15 minutes or reset your MPIN.")
+    if not account.mpin_hash or not verify_password(mpin, account.mpin_hash):
+        account.mpin_failed_attempts = (account.mpin_failed_attempts or 0) + 1
+        if account.mpin_failed_attempts >= MPIN_MAX_ATTEMPTS:
+            account.mpin_locked_until = now + timedelta(minutes=MPIN_LOCK_MINUTES)
+            db.commit()
+            raise HTTPException(status_code=429, detail="Too many incorrect MPIN attempts. Try again after 15 minutes or reset your MPIN.")
+        remaining = MPIN_MAX_ATTEMPTS - account.mpin_failed_attempts
+        db.commit()
+        raise HTTPException(status_code=401, detail=f"Incorrect MPIN. {remaining} attempt{'s' if remaining != 1 else ''} remaining.")
+    account.mpin_failed_attempts = 0
+    account.mpin_locked_until = None
+
+
+def staff_session(user: StaffUser) -> dict:
+    return {"access_token": create_access_token(user), "shop_id": user.shop_id, "staff_name": user.name, "is_platform_admin": user.is_platform_admin, "must_change_password": user.must_change_password, "role": user.role, "barber_id": user.barber_id, "requires_mpin_setup": not user.is_platform_admin and not bool(user.mpin_hash)}
 
 
 def banner_value(db: Session) -> dict:
@@ -56,6 +113,32 @@ def banner_value(db: Session) -> dict:
 
 def slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def new_barber_number(db: Session) -> str:
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    while True:
+        value = "BRB-" + "".join(secrets.choice(alphabet) for _ in range(6))
+        if not db.scalar(select(BarberProfile.id).where(BarberProfile.barber_number == value)):
+            return value
+
+
+def barber_view(db: Session, barber: Barber) -> dict:
+    profile = db.get(BarberProfile, barber.barber_profile_id) if barber.barber_profile_id else None
+    career_filter = Rating.barber_profile_id == profile.id if profile else Rating.barber_id == barber.id
+    career_values = list(db.scalars(select(Rating.barber_stars).where(career_filter, Rating.barber_stars.is_not(None))).all())
+    shop_values = list(db.scalars(select(Rating.barber_stars).where(career_filter, Rating.shop_id == barber.shop_id, Rating.barber_stars.is_not(None))).all())
+    years = 0
+    if profile and profile.career_started_on:
+        today = date.today()
+        years = max(0, today.year - profile.career_started_on.year - ((today.month, today.day) < (profile.career_started_on.month, profile.career_started_on.day)))
+    return {"id": barber.id, "name": barber.name, "is_active": barber.is_active,
+        "barber_number": profile.barber_number if profile else None, "barber_profile_id": profile.id if profile else None,
+        "photo_url": profile.photo_url if profile else None, "experience_years": years,
+        "specialities": (profile.specialities or []) if profile else [],
+        "career_rating": round(sum(career_values) / len(career_values), 1) if career_values else 0,
+        "career_rating_count": len(career_values), "shop_rating": round(sum(shop_values) / len(shop_values), 1) if shop_values else 0,
+        "shop_rating_count": len(shop_values)}
 
 
 def normalize_phone(value: str | None) -> str | None:
@@ -124,19 +207,28 @@ def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int
     now = datetime.now(timezone.utc)
     # selectinload uses a separate SELECT for services. A joinedload would add a
     # LEFT OUTER JOIN, which PostgreSQL cannot combine with FOR UPDATE here.
-    statement = select(Appointment).options(selectinload(Appointment.service)).where(Appointment.status.in_(("booked", "confirmed"))).order_by(Appointment.scheduled_at, Appointment.id).with_for_update(skip_locked=True)
+    statement = select(Appointment).options(selectinload(Appointment.service)).where(Appointment.status.in_(("booked", "confirmed", "queued"))).order_by(Appointment.scheduled_at, Appointment.id).with_for_update(skip_locked=True)
     if shop_id is not None:
         statement = statement.where(Appointment.shop_id == shop_id)
     promoted_shops: set[int] = set()
     for appointment in db.scalars(statement).all():
         scheduled_at = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
-        queue_entry_time = scheduled_at - timedelta(minutes=appointment_duration(appointment))
+        shop = db.get(Shop, appointment.shop_id)
+        grace = shop.appointment_grace_minutes if shop else 10
+        queue_entry_time = scheduled_at - timedelta(minutes=grace)
         if queue_entry_time > now:
             continue
-        if db.scalar(select(QueueEntry.id).where(QueueEntry.appointment_id == appointment.id)):
-            appointment.status = "queued"
+        existing = db.scalar(select(QueueEntry).where(QueueEntry.appointment_id == appointment.id))
+        if existing:
+            new_priority = now >= scheduled_at
+            if existing.priority_active != new_priority:
+                existing.priority_active = new_priority
+                promoted_shops.add(appointment.shop_id)
+            if appointment.status != "queued":
+                appointment.status = "queued"
+                promoted_shops.add(appointment.shop_id)
             continue
-        db.add(QueueEntry(appointment_id=appointment.id, shop_id=appointment.shop_id, customer_id=appointment.customer_id, service_id=appointment.service_id, service_ids=appointment.service_ids, service_names=appointment.service_names, total_duration_minutes=appointment.total_duration_minutes, total_price_rupees=appointment.total_price_rupees, barber_id=appointment.barber_id, customer_name=appointment.customer_name, phone=appointment.phone, source="appointment", joined_at=queue_entry_time))
+        db.add(QueueEntry(appointment_id=appointment.id, shop_id=appointment.shop_id, customer_id=appointment.customer_id, service_id=appointment.service_id, service_ids=appointment.service_ids, service_names=appointment.service_names, total_duration_minutes=appointment.total_duration_minutes, total_price_rupees=appointment.total_price_rupees, barber_id=appointment.barber_id, barber_profile_id=appointment.barber_profile_id, customer_name=appointment.customer_name, phone=appointment.phone, source="appointment", priority_active=now >= scheduled_at, joined_at=scheduled_at))
         appointment.status = "queued"
         audit(db, "appointment.promoted_to_queue", shop_id=appointment.shop_id, details=f"appointment_id={appointment.id}")
         promoted_shops.add(appointment.shop_id)
@@ -191,6 +283,13 @@ async def lifespan(_: FastAPI):
     validate_production_settings()
     if settings.environment != "production":
         Base.metadata.create_all(bind=engine)
+        try:
+            with engine.begin() as conn:
+                cols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(shops)").fetchall()]
+                if "appointments_enabled" not in cols:
+                    conn.exec_driver_sql("ALTER TABLE shops ADD COLUMN appointments_enabled BOOLEAN DEFAULT 1")
+        except Exception:
+            pass
         seed_demo_data()
     promotion_task = asyncio.create_task(appointment_promotion_loop())
     try:
@@ -321,7 +420,7 @@ async def upload_login_image(image: UploadFile = File(...), staff: StaffUser = D
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.3.0"}
+    return {"status": "ok", "version": "0.4.0"}
 
 
 @app.get("/api/push/public-key")
@@ -355,7 +454,33 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This staff account is inactive. Contact your shop owner or administrator.")
-    return {"access_token": create_access_token(user), "shop_id": user.shop_id, "staff_name": user.name, "is_platform_admin": user.is_platform_admin, "must_change_password": user.must_change_password, "role": user.role, "barber_id": user.barber_id}
+    if payload.device_id and user.mpin_hash and not user.is_platform_admin:
+        remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=user.id)
+        db.commit()
+    return staff_session(user)
+
+
+@app.post("/api/auth/check-device")
+def check_staff_device(payload: DeviceCheckRequest, db: Session = Depends(get_db)):
+    identifier = payload.identifier.strip().lower()
+    user = db.scalar(select(StaffUser).where(StaffUser.email == identifier)) if "@" in identifier else db.scalar(select(StaffUser).where(StaffUser.phone == normalize_phone(identifier)))
+    enabled = bool(user and user.is_active and not user.is_platform_admin and user.mpin_hash and trusted_device(db, device_id=payload.device_id, staff_user_id=user.id))
+    return {"mpin_login": enabled}
+
+
+@app.post("/api/auth/login-mpin", response_model=TokenOut)
+def staff_mpin_login(payload: MpinLoginRequest, db: Session = Depends(get_db)):
+    identifier = payload.identifier.strip().lower()
+    user = db.scalar(select(StaffUser).where(StaffUser.email == identifier)) if "@" in identifier else db.scalar(select(StaffUser).where(StaffUser.phone == normalize_phone(identifier)))
+    if user is None or not user.is_active or user.is_platform_admin:
+        raise HTTPException(status_code=401, detail="MPIN sign-in is not available for this account")
+    device = trusted_device(db, device_id=payload.device_id, staff_user_id=user.id)
+    if device is None:
+        raise HTTPException(status_code=401, detail="This device is not trusted. Sign in with your password first.")
+    verify_mpin(user, payload.mpin, db)
+    device.last_used_at = datetime.now(timezone.utc)
+    db.commit()
+    return staff_session(user)
 
 
 @app.get("/api/auth/google/config")
@@ -379,7 +504,10 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="No staff account is registered with this Google email")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This staff account is inactive")
-    return {"access_token": create_access_token(user), "shop_id": user.shop_id, "staff_name": user.name, "is_platform_admin": user.is_platform_admin, "must_change_password": user.must_change_password, "role": user.role, "barber_id": user.barber_id}
+    if payload.device_id and user.mpin_hash and not user.is_platform_admin:
+        remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=user.id)
+        db.commit()
+    return staff_session(user)
 
 
 def customer_identifier(value: str) -> tuple[str, str]:
@@ -415,7 +543,7 @@ def request_customer_otp(payload: CustomerOtpRequest, background_tasks: Backgrou
     db.commit()
     if kind == "email":
         background_tasks.add_task(send_customer_otp_email, identifier, otp)
-    response = {"message": f"OTP sent to your {kind}. It is valid for 10 minutes.", "expires_in_seconds": 600, "first_time": not bool(customer.terms_accepted_at)}
+    response = {"message": f"OTP sent to your {kind}. It is valid for 10 minutes.", "expires_in_seconds": 600, "first_time": not bool(customer.terms_accepted_at), "has_mpin": bool(customer.mpin_hash)}
     if settings.environment != "production" and (kind == "phone" or not smtp_is_configured()):
         response["development_otp"] = otp
     return response
@@ -451,6 +579,57 @@ def verify_customer_otp(payload: CustomerOtpVerify, db: Session = Depends(get_db
     customer.otp_expires_at = None
     customer.otp_attempts = 0
     db.commit()
+    return {"verification_token": create_mpin_verification_token(customer.id, payload.reset_mpin), "requires_mpin_setup": not bool(customer.mpin_hash) or payload.reset_mpin, "customer": {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}}
+
+
+@app.post("/api/customer-auth/check-device")
+def check_customer_device(payload: DeviceCheckRequest, db: Session = Depends(get_db)):
+    kind, identifier = customer_identifier(payload.identifier)
+    customer = db.scalar(select(CustomerUser).where(getattr(CustomerUser, kind) == identifier))
+    enabled = bool(customer and customer.is_verified and customer.mpin_hash and trusted_device(db, device_id=payload.device_id, customer_id=customer.id))
+    return {"mpin_login": enabled}
+
+
+@app.post("/api/customer-auth/login-mpin")
+def customer_mpin_login(payload: MpinLoginRequest, db: Session = Depends(get_db)):
+    kind, identifier = customer_identifier(payload.identifier)
+    customer = db.scalar(select(CustomerUser).where(getattr(CustomerUser, kind) == identifier))
+    if customer is None or not customer.is_verified:
+        raise HTTPException(status_code=401, detail="Customer account not found. Verify with OTP first.")
+    device = trusted_device(db, device_id=payload.device_id, customer_id=customer.id)
+    if device is None:
+        raise HTTPException(status_code=401, detail="This device is not trusted. Verify with OTP first.")
+    verify_mpin(customer, payload.mpin, db)
+    device.last_used_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"access_token": create_customer_token(customer.id), "customer": {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}}
+
+
+@app.post("/api/customer-auth/complete-mpin")
+def complete_customer_mpin(payload: CustomerMpinComplete, db: Session = Depends(get_db)):
+    token = decode_access_token(payload.verification_token)
+    if token.get("type") != "customer_mpin_verification":
+        raise HTTPException(status_code=401, detail="Invalid MPIN verification session")
+    customer = db.get(CustomerUser, int(token["sub"]))
+    if customer is None or not customer.is_verified:
+        raise HTTPException(status_code=401, detail="Customer account not found")
+    reset = bool(token.get("reset_mpin"))
+    if customer.mpin_hash and not reset:
+        verify_mpin(customer, payload.mpin, db)
+    else:
+        if payload.mpin != payload.confirm_mpin:
+            raise HTTPException(status_code=422, detail="MPIN and confirmation do not match")
+        if weak_mpin(payload.mpin):
+            raise HTTPException(status_code=422, detail="Choose a less predictable MPIN. Avoid repeated digits and simple sequences.")
+        customer.mpin_hash = hash_password(payload.mpin)
+        customer.mpin_set_at = datetime.now(timezone.utc)
+        customer.mpin_failed_attempts = 0
+        customer.mpin_locked_until = None
+        if reset:
+            for item in db.scalars(select(TrustedDeviceSession).where(TrustedDeviceSession.customer_id == customer.id, TrustedDeviceSession.revoked_at.is_(None))):
+                item.revoked_at = datetime.now(timezone.utc)
+    remember_device(db, device_id=payload.device_id, device_name=payload.device_name, customer_id=customer.id)
+    db.commit()
     return {"access_token": create_customer_token(customer.id), "customer": {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}}
 
 
@@ -465,6 +644,24 @@ def customer_me(request: Request, db: Session = Depends(get_db)):
     customer = db.get(CustomerUser, int(payload["sub"]))
     if customer is None or not customer.is_verified:
         raise HTTPException(status_code=401, detail="Customer session is no longer valid")
+    return {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}
+
+
+@app.patch("/api/customer-auth/me")
+def update_customer_me(payload: CustomerProfileUpdate, request: Request, db: Session = Depends(get_db)):
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Customer login required")
+    token = decode_access_token(header[7:])
+    if token.get("type") != "customer":
+        raise HTTPException(status_code=401, detail="Invalid customer session")
+    customer = db.get(CustomerUser, int(token["sub"]))
+    if customer is None or not customer.is_verified:
+        raise HTTPException(status_code=401, detail="Customer session is no longer valid")
+    customer.name = payload.name.strip()
+    customer.age = payload.age
+    customer.gender = payload.gender
+    db.commit()
     return {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}
 
 
@@ -531,6 +728,11 @@ def reset_password(payload: PasswordResetConfirm, db: Session = Depends(get_db))
     user.password_reset_token_hash = None
     user.password_reset_expires_at = None
     user.must_change_password = False
+    user.mpin_hash = None
+    user.mpin_set_at = None
+    now = datetime.now(timezone.utc)
+    for device in db.scalars(select(TrustedDeviceSession).where(TrustedDeviceSession.staff_user_id == user.id, TrustedDeviceSession.revoked_at.is_(None))):
+        device.revoked_at = now
     audit(db, "staff.password_reset_by_email", user, user.shop_id)
     db.commit()
     return {"message": "Password reset successfully. You can now sign in."}
@@ -550,7 +752,6 @@ def register_shop(payload: AdminShopCreate, db: Session = Depends(get_db)):
     shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, approval_status="approved")
     db.add(shop)
     db.flush()
-    db.add(Service(shop_id=shop.id, name="Other", duration_minutes=20, price_rupees=0))
     phone = normalize_phone(payload.phone)
     if phone and db.scalar(select(StaffUser.id).where(StaffUser.phone == phone)):
         raise HTTPException(status_code=409, detail="This phone number is already registered")
@@ -559,7 +760,7 @@ def register_shop(payload: AdminShopCreate, db: Session = Depends(get_db)):
     audit(db, "shop.self_registered", owner, shop.id, f"Owner {email}")
     db.commit()
     db.refresh(owner)
-    return {"access_token": create_access_token(owner), "shop_id": owner.shop_id, "staff_name": owner.name, "is_platform_admin": False, "must_change_password": False, "role": owner.role, "barber_id": None}
+    return staff_session(owner)
 
 
 @app.post("/api/auth/change-password")
@@ -575,6 +776,38 @@ def change_password(payload: PasswordChange, staff: StaffUser = Depends(current_
     return {"message": "Password changed successfully"}
 
 
+@app.post("/api/auth/set-mpin")
+def set_staff_mpin(payload: MpinSetRequest, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    if staff.is_platform_admin:
+        raise HTTPException(status_code=403, detail="Platform administrators must use password or Google sign-in")
+    if payload.mpin != payload.confirm_mpin:
+        raise HTTPException(status_code=422, detail="MPIN and confirmation do not match")
+    if weak_mpin(payload.mpin):
+        raise HTTPException(status_code=422, detail="Choose a less predictable MPIN. Avoid repeated digits and simple sequences.")
+    if staff.mpin_hash:
+        valid_current = bool(payload.current_mpin and verify_password(payload.current_mpin, staff.mpin_hash))
+        valid_password = bool(payload.password and verify_password(payload.password, staff.password_hash))
+        if not valid_current and not valid_password:
+            raise HTTPException(status_code=400, detail="Enter your current MPIN or account password")
+    staff.mpin_hash = hash_password(payload.mpin)
+    staff.mpin_set_at = datetime.now(timezone.utc)
+    staff.mpin_failed_attempts = 0
+    staff.mpin_locked_until = None
+    if payload.device_id:
+        remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=staff.id)
+    db.commit()
+    return {"message": "MPIN saved. You can use it on this trusted device for 90 days."}
+
+
+@app.post("/api/auth/logout-all")
+def logout_all_staff(staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    for device in db.scalars(select(TrustedDeviceSession).where(TrustedDeviceSession.staff_user_id == staff.id, TrustedDeviceSession.revoked_at.is_(None))):
+        device.revoked_at = now
+    db.commit()
+    return {"message": "Signed out from all trusted devices"}
+
+
 @app.get("/api/shops/{shop_id}", response_model=ShopOut)
 def get_shop(shop_id: int, db: Session = Depends(get_db)):
     shop = db.scalar(select(Shop).options(selectinload(Shop.services), selectinload(Shop.barbers)).where(Shop.id == shop_id))
@@ -583,7 +816,7 @@ def get_shop(shop_id: int, db: Session = Depends(get_db)):
     waiting = [item for item in active_queue(db, shop_id) if item.status == QueueStatus.WAITING]
     waits = estimated_waits(db, shop_id)
     ratings = [item.stars for item in shop.ratings]
-    return {"id": shop.id, "name": shop.name, "address": shop.address, "phone": shop.phone, "gst_number": shop.gst_number, "slug": shop.slug, "latitude": shop.latitude, "longitude": shop.longitude, "approval_status": shop.approval_status, "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0, "rating_count": len(ratings), "timezone": shop.timezone, "opens_at": shop.opens_at, "closes_at": shop.closes_at, "queue_paused": shop.queue_paused, "photo_url": shop.photo_url, "waiting_count": len(waiting), "estimated_wait_minutes": max(waits.values(), default=0), "services": [item for item in shop.services if item.is_active], "barbers": [item for item in shop.barbers if item.is_active]}
+    return {"id": shop.id, "name": shop.name, "address": shop.address, "phone": shop.phone, "gst_number": shop.gst_number, "slug": shop.slug, "latitude": shop.latitude, "longitude": shop.longitude, "approval_status": shop.approval_status, "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0, "rating_count": len(ratings), "timezone": shop.timezone, "opens_at": shop.opens_at, "closes_at": shop.closes_at, "queue_paused": shop.queue_paused, "appointments_enabled": getattr(shop, "appointments_enabled", True), "photo_url": shop.photo_url, "waiting_count": len(waiting), "estimated_wait_minutes": max(waits.values(), default=0), "services": [item for item in shop.services if item.is_active], "barbers": [barber_view(db, item) for item in shop.barbers if item.is_active]}
 
 
 @app.get("/api/shops", response_model=list[ShopOut])
@@ -656,6 +889,12 @@ async def add_service(shop_id: int, payload: ServiceCreate, staff: StaffUser = D
     require_owner(staff)
     service = Service(shop_id=shop_id, **payload.model_dump())
     db.add(service)
+    db.flush()
+    # Existing active barbers inherit a newly created service. Owners can then
+    # remove it from individual profiles in Team & Staff.
+    memberships = db.scalars(select(ShopBarberMembership).where(ShopBarberMembership.shop_id == shop_id, ShopBarberMembership.is_active.is_(True))).all()
+    for membership in memberships:
+        db.add(BarberServiceAssignment(membership_id=membership.id, service_id=service.id))
     db.commit()
     db.refresh(service)
     await manager.queue_changed(shop_id)
@@ -684,9 +923,6 @@ async def delete_service(service_id: int, staff: StaffUser = Depends(current_sta
         raise HTTPException(status_code=404, detail="Service not found")
     require_shop(staff, service.shop_id)
     require_owner(staff)
-    active_count = db.scalar(select(func.count(Service.id)).where(Service.shop_id == service.shop_id, Service.is_active.is_(True)))
-    if active_count <= 1:
-        raise HTTPException(status_code=409, detail="A shop must keep at least one active service")
     service.is_active = False
     audit(db, "service.deleted", staff, service.shop_id, f"service_id={service.id}")
     db.commit()
@@ -715,7 +951,7 @@ def add_staff(shop_id: int, payload: StaffCreate, staff: StaffUser = Depends(cur
     barber = db.get(Barber, payload.barber_id) if payload.barber_id else None
     if payload.role == "barber" and (barber is None or barber.shop_id != shop_id):
         raise HTTPException(status_code=400, detail="Choose the barber profile linked to this staff login")
-    user = StaffUser(shop_id=shop_id, barber_id=barber.id if barber else None, name=payload.name.strip(), email=email, phone=phone, password_hash=hash_password(payload.password), role=payload.role, must_change_password=True)
+    user = StaffUser(shop_id=shop_id, barber_id=barber.id if barber else None, barber_profile_id=barber.barber_profile_id if barber else None, name=payload.name.strip(), email=email, phone=phone, password_hash=hash_password(payload.password), role=payload.role, must_change_password=True)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -730,6 +966,11 @@ def reset_staff_password(staff_id: int, payload: StaffPasswordReset, actor: Staf
     require_staff_manager(actor, target)
     target.password_hash = hash_password(payload.temporary_password)
     target.must_change_password = True
+    target.mpin_hash = None
+    target.mpin_set_at = None
+    now = datetime.now(timezone.utc)
+    for device in db.scalars(select(TrustedDeviceSession).where(TrustedDeviceSession.staff_user_id == target.id, TrustedDeviceSession.revoked_at.is_(None))):
+        device.revoked_at = now
     audit(db, "staff.password_reset", actor, target.shop_id, f"staff_id={target.id}")
     db.commit()
     db.refresh(target)
@@ -763,6 +1004,7 @@ def update_staff_profile(staff_id: int, payload: StaffProfileUpdate, actor: Staf
     target.name = payload.name.strip()
     target.role = payload.role
     target.barber_id = barber.id if payload.role == "barber" else None
+    target.barber_profile_id = barber.barber_profile_id if payload.role == "barber" and barber else None
     audit(db, "staff.profile_changed", actor, target.shop_id, f"staff_id={target.id};role={target.role};barber_id={target.barber_id}")
     db.commit()
     db.refresh(target)
@@ -857,7 +1099,7 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
         ) or 0
         if daily_join_count >= 3:
             raise HTTPException(status_code=409, detail="You already have three non-completed live-queue joins today. Complete an active service or try again tomorrow before joining another queue with the same customer account, phone number, or email address.")
-    entry = QueueEntry(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id if service else None, service_ids=[service.id] if service else [], service_names=service.name if service else None, total_duration_minutes=service.duration_minutes if service else None, total_price_rupees=service.price_rupees if service else None, barber_id=barber.id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, email=str(payload.email).lower() if payload.email else None, source=payload.source, queue_day=queue_day, daily_token_number=next_token_number)
+    entry = QueueEntry(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id if service else None, service_ids=[service.id] if service else [], service_names=service.name if service else None, total_duration_minutes=service.duration_minutes if service else None, total_price_rupees=service.price_rupees if service else None, barber_id=barber.id if barber else None, barber_profile_id=barber.barber_profile_id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, email=str(payload.email).lower() if payload.email else None, source=payload.source, queue_day=queue_day, daily_token_number=next_token_number)
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -913,6 +1155,7 @@ async def update_queue_entry(entry_id: int, payload: StaffAction, staff: StaffUs
         if barber is None or barber.shop_id != entry.shop_id or not barber.is_active:
             raise HTTPException(status_code=400, detail="Selected barber is unavailable")
         entry.barber_id = barber.id
+        entry.barber_profile_id = barber.barber_profile_id
         entry.barber = barber
     if payload.service_ids and entry.source != "appointment":
         service_ids = list(dict.fromkeys(payload.service_ids))
@@ -950,6 +1193,18 @@ async def update_queue_entry(entry_id: int, payload: StaffAction, staff: StaffUs
         busy = db.scalar(select(QueueEntry.id).where(QueueEntry.barber_id == entry.barber_id, QueueEntry.status == QueueStatus.SERVING, QueueEntry.id != entry.id))
         if busy:
             raise HTTPException(status_code=409, detail="This barber is already serving another customer. Please choose a different barber or wait until this barber is free.")
+        assigned = db.get(Barber, entry.barber_id)
+        if not barber_provides_services(db, assigned, entry.service_ids or []):
+            raise HTTPException(status_code=409, detail="This barber is not assigned to all selected services. Choose another barber or update their services.")
+        shop = db.get(Shop, entry.shop_id)
+        service_end = now + timedelta(minutes=entry.total_duration_minutes or 20)
+        local_day = now.astimezone(shop_zone(shop)).date()
+        windows = [(start.astimezone(timezone.utc), end.astimezone(timezone.utc)) for start, end in scheduled_windows(db, shop, assigned, local_day)]
+        if windows and not any(start <= now and service_end <= end for start, end in windows):
+            raise HTTPException(status_code=409, detail="The complete service does not fit within this barber's current shift.")
+        reservation = next_reservation(db, entry.barber_id, now)
+        if reservation and service_end > (reservation.scheduled_at if reservation.scheduled_at.tzinfo else reservation.scheduled_at.replace(tzinfo=timezone.utc)):
+            raise HTTPException(status_code=409, detail=f"This service would overlap the barber's {reservation.scheduled_at.astimezone(shop_zone(shop)).strftime('%I:%M %p')} appointment. Choose another barber or serve it after the appointment.")
         entry.started_at = now
     if payload.action == "complete":
         entry.completed_at = now
@@ -974,12 +1229,29 @@ async def update_queue_entry(entry_id: int, payload: StaffAction, staff: StaffUs
 async def add_barber(shop_id: int, payload: BarberCreate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
     require_shop(staff, shop_id)
     require_owner(staff)
-    barber = Barber(shop_id=shop_id, name=payload.name.strip())
+    if payload.career_started_on and payload.career_started_on > date.today():
+        raise HTTPException(status_code=422, detail="Career start date cannot be in the future")
+    shop = db.get(Shop, shop_id)
+    profile = BarberProfile(barber_number=new_barber_number(db), full_name=payload.name.strip(), email=str(payload.email).lower() if payload.email else None,
+        phone=normalize_phone(payload.phone), career_started_on=payload.career_started_on, biography=payload.biography,
+        specialities=payload.specialities, certifications=[])
+    db.add(profile)
+    db.flush()
+    membership = ShopBarberMembership(barber_profile_id=profile.id, shop_id=shop_id, display_name=payload.name.strip(), status="active", is_active=True)
+    db.add(membership)
+    db.flush()
+    barber = Barber(shop_id=shop_id, barber_profile_id=profile.id, membership_id=membership.id, name=payload.name.strip())
     db.add(barber)
+    service_ids = payload.service_ids or list(db.scalars(select(Service.id).where(Service.shop_id == shop_id, Service.is_active.is_(True))).all())
+    for service_id in service_ids:
+        if db.scalar(select(Service.id).where(Service.id == service_id, Service.shop_id == shop_id)):
+            db.add(BarberServiceAssignment(membership_id=membership.id, service_id=service_id))
+    for weekday in range(7):
+        db.add(BarberWeeklyAvailability(membership_id=membership.id, weekday=weekday, starts_at=dt_time.fromisoformat(shop.opens_at), ends_at=dt_time.fromisoformat(shop.closes_at)))
     db.commit()
     db.refresh(barber)
     await manager.queue_changed(shop_id)
-    return barber
+    return barber_view(db, barber)
 
 
 @app.patch("/api/barbers/{barber_id}", response_model=BarberOut)
@@ -994,7 +1266,88 @@ async def update_barber(barber_id: int, payload: BarberUpdate, staff: StaffUser 
     db.commit()
     db.refresh(barber)
     await manager.queue_changed(barber.shop_id)
-    return barber
+    return barber_view(db, barber)
+
+
+@app.get("/api/barbers/{barber_id}/profile")
+def get_barber_profile(barber_id: int, db: Session = Depends(get_db)):
+    barber = db.get(Barber, barber_id)
+    if barber is None:
+        raise HTTPException(status_code=404, detail="Barber not found")
+    profile = db.get(BarberProfile, barber.barber_profile_id) if barber.barber_profile_id else None
+    membership = db.get(ShopBarberMembership, barber.membership_id) if barber.membership_id else None
+    view = barber_view(db, barber)
+    view.update({"full_name": profile.full_name if profile else barber.name, "phone": profile.phone if profile else None,
+        "email": profile.email if profile else None, "gender": profile.gender if profile else None,
+        "career_started_on": profile.career_started_on if profile else None, "biography": profile.biography if profile else None,
+        "certifications": profile.certifications or [] if profile else [], "membership_id": membership.id if membership else None,
+        "services": list(db.scalars(select(BarberServiceAssignment.service_id).where(BarberServiceAssignment.membership_id == membership.id, BarberServiceAssignment.is_active.is_(True))).all()) if membership else [],
+        "weekly_availability": [{"id": row.id, "weekday": row.weekday, "starts_at": row.starts_at.strftime("%H:%M"), "ends_at": row.ends_at.strftime("%H:%M"), "is_active": row.is_active} for row in db.scalars(select(BarberWeeklyAvailability).where(BarberWeeklyAvailability.membership_id == membership.id).order_by(BarberWeeklyAvailability.weekday, BarberWeeklyAvailability.starts_at)).all()] if membership else [],
+        "exceptions": [{"id": row.id, "type": row.exception_type, "starts_at": row.starts_at, "ends_at": row.ends_at, "reason": row.reason, "approval_status": row.approval_status} for row in db.scalars(select(BarberAvailabilityException).where(BarberAvailabilityException.membership_id == membership.id).order_by(BarberAvailabilityException.starts_at.desc()).limit(50)).all()] if membership else [],
+        "memberships": [{"shop_id": row.shop_id, "shop_name": db.get(Shop, row.shop_id).name, "joined_on": row.joined_on, "left_on": row.left_on, "status": row.status} for row in db.scalars(select(ShopBarberMembership).where(ShopBarberMembership.barber_profile_id == profile.id).order_by(ShopBarberMembership.joined_on.desc())).all()] if profile else []})
+    return view
+
+
+@app.patch("/api/barbers/{barber_id}/profile")
+def update_barber_profile(barber_id: int, payload: BarberProfileUpdate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    barber = db.get(Barber, barber_id)
+    if barber is None:
+        raise HTTPException(status_code=404, detail="Barber not found")
+    if not (staff.is_platform_admin or (staff.shop_id == barber.shop_id and staff.role in ("owner", "manager")) or staff.barber_profile_id == barber.barber_profile_id):
+        raise HTTPException(status_code=403, detail="You cannot edit this barber profile")
+    if payload.career_started_on and payload.career_started_on > date.today():
+        raise HTTPException(status_code=422, detail="Career start date cannot be in the future")
+    profile = db.get(BarberProfile, barber.barber_profile_id)
+    for field, value in payload.model_dump().items():
+        setattr(profile, field, str(value).lower() if field == "email" and value else value)
+    barber.name = payload.full_name
+    db.commit()
+    return get_barber_profile(barber_id, db)
+
+
+@app.put("/api/barbers/{barber_id}/services")
+def update_barber_services(barber_id: int, payload: BarberServicesUpdate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    barber = db.get(Barber, barber_id)
+    if barber is None or not barber.membership_id:
+        raise HTTPException(status_code=404, detail="Barber membership not found")
+    require_shop(staff, barber.shop_id); require_owner(staff)
+    valid = set(db.scalars(select(Service.id).where(Service.shop_id == barber.shop_id, Service.id.in_(payload.service_ids), Service.is_active.is_(True))).all())
+    if valid != set(payload.service_ids):
+        raise HTTPException(status_code=422, detail="Choose active services from this shop")
+    for row in db.scalars(select(BarberServiceAssignment).where(BarberServiceAssignment.membership_id == barber.membership_id)).all():
+        db.delete(row)
+    for service_id in payload.service_ids:
+        db.add(BarberServiceAssignment(membership_id=barber.membership_id, service_id=service_id))
+    db.commit()
+    return get_barber_profile(barber_id, db)
+
+
+@app.put("/api/barbers/{barber_id}/availability")
+def update_barber_availability(barber_id: int, payload: WeeklyAvailabilityUpdate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    barber = db.get(Barber, barber_id)
+    if barber is None or not barber.membership_id:
+        raise HTTPException(status_code=404, detail="Barber membership not found")
+    require_shop(staff, barber.shop_id); require_owner(staff)
+    for row in db.scalars(select(BarberWeeklyAvailability).where(BarberWeeklyAvailability.membership_id == barber.membership_id)).all():
+        db.delete(row)
+    for period in payload.periods:
+        db.add(BarberWeeklyAvailability(membership_id=barber.membership_id, weekday=period.weekday, starts_at=dt_time.fromisoformat(period.starts_at), ends_at=dt_time.fromisoformat(period.ends_at), is_active=period.is_active))
+    db.commit()
+    return get_barber_profile(barber_id, db)
+
+
+@app.post("/api/barbers/{barber_id}/exceptions", status_code=201)
+def add_barber_exception(barber_id: int, payload: AvailabilityExceptionCreate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    barber = db.get(Barber, barber_id)
+    if barber is None or not barber.membership_id:
+        raise HTTPException(status_code=404, detail="Barber membership not found")
+    require_shop(staff, barber.shop_id)
+    if payload.ends_at <= payload.starts_at:
+        raise HTTPException(status_code=422, detail="Exception end must be after its start")
+    approval = payload.approval_status if staff.role in ("owner", "manager") else "pending"
+    item = BarberAvailabilityException(membership_id=barber.membership_id, exception_type=payload.exception_type, starts_at=payload.starts_at, ends_at=payload.ends_at, reason=payload.reason, approval_status=approval)
+    db.add(item); db.commit(); db.refresh(item)
+    return {"id": item.id, "approval_status": item.approval_status}
 
 
 @app.delete("/api/barbers/{barber_id}", status_code=204)
@@ -1012,9 +1365,76 @@ async def delete_barber(barber_id: int, staff: StaffUser = Depends(current_staff
     for appointment in db.scalars(select(Appointment).where(Appointment.barber_id == barber.id, Appointment.status.in_(("booked", "confirmed")))).all():
         appointment.barber_id = None
     barber.is_active = False
+    if barber.membership_id:
+        membership = db.get(ShopBarberMembership, barber.membership_id)
+        membership.is_active = False
+        membership.status = "ended"
+        membership.left_on = date.today()
     audit(db, "barber.deleted", staff, barber.shop_id, f"{barber.id}:{barber.name}")
     db.commit()
     await manager.queue_changed(barber.shop_id)
+
+
+@app.get("/api/barber-profiles/search")
+def search_barber_profile(barber_number: str, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    profile = db.scalar(select(BarberProfile).where(func.upper(BarberProfile.barber_number) == barber_number.strip().upper()))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No barber profile was found with this number")
+    values = list(db.scalars(select(Rating.barber_stars).where(Rating.barber_profile_id == profile.id, Rating.barber_stars.is_not(None))).all())
+    return {"barber_number": profile.barber_number, "full_name": profile.full_name, "photo_url": profile.photo_url,
+        "specialities": profile.specialities or [], "experience_years": max(0, date.today().year - profile.career_started_on.year) if profile.career_started_on else 0,
+        "career_rating": round(sum(values) / len(values), 1) if values else 0, "career_rating_count": len(values)}
+
+
+@app.post("/api/shops/{shop_id}/barber-invitations", status_code=201)
+def invite_barber(shop_id: int, payload: BarberInvitationCreate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    require_shop(staff, shop_id); require_owner(staff)
+    profile = db.scalar(select(BarberProfile).where(func.upper(BarberProfile.barber_number) == payload.barber_number.strip().upper()))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="No barber profile was found with this number")
+    pending = db.scalar(select(BarberMembershipRequest).where(BarberMembershipRequest.barber_profile_id == profile.id, BarberMembershipRequest.shop_id == shop_id, BarberMembershipRequest.status == "pending"))
+    if pending:
+        raise HTTPException(status_code=409, detail="An invitation is already pending")
+    item = BarberMembershipRequest(barber_profile_id=profile.id, shop_id=shop_id, requested_by_id=staff.id, message=payload.message)
+    db.add(item); audit(db, "barber.invited", staff, shop_id, profile.barber_number); db.commit(); db.refresh(item)
+    return {"id": item.id, "status": item.status, "barber_number": profile.barber_number}
+
+
+@app.get("/api/my-barber/invitations")
+def my_barber_invitations(staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    if not staff.barber_profile_id:
+        return []
+    rows = db.scalars(select(BarberMembershipRequest).where(BarberMembershipRequest.barber_profile_id == staff.barber_profile_id).order_by(BarberMembershipRequest.created_at.desc())).all()
+    return [{"id": item.id, "shop_id": item.shop_id, "shop_name": db.get(Shop, item.shop_id).name, "status": item.status, "message": item.message, "created_at": item.created_at} for item in rows]
+
+
+@app.post("/api/barber-invitations/{request_id}/action")
+def respond_barber_invitation(request_id: int, payload: MembershipRequestAction, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    item = db.scalar(select(BarberMembershipRequest).where(BarberMembershipRequest.id == request_id).with_for_update())
+    if item is None or item.barber_profile_id != staff.barber_profile_id:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if item.status != "pending":
+        raise HTTPException(status_code=409, detail="This invitation has already been answered")
+    item.status = "approved" if payload.action == "approve" else "rejected"
+    item.responded_at = datetime.now(timezone.utc)
+    if payload.action == "approve":
+        for old in db.scalars(select(ShopBarberMembership).where(ShopBarberMembership.barber_profile_id == item.barber_profile_id, ShopBarberMembership.is_active.is_(True))).all():
+            old.is_active = False; old.status = "transferred"; old.left_on = date.today()
+            for old_barber in db.scalars(select(Barber).where(Barber.membership_id == old.id)).all():
+                old_barber.is_active = False
+        profile = db.get(BarberProfile, item.barber_profile_id)
+        membership = ShopBarberMembership(barber_profile_id=profile.id, shop_id=item.shop_id, display_name=profile.full_name, status="active", is_active=True)
+        db.add(membership); db.flush()
+        barber = Barber(shop_id=item.shop_id, barber_profile_id=profile.id, membership_id=membership.id, name=profile.full_name)
+        db.add(barber); db.flush()
+        shop = db.get(Shop, item.shop_id)
+        for service_id in db.scalars(select(Service.id).where(Service.shop_id == item.shop_id, Service.is_active.is_(True))).all():
+            db.add(BarberServiceAssignment(membership_id=membership.id, service_id=service_id))
+        for weekday in range(7):
+            db.add(BarberWeeklyAvailability(membership_id=membership.id, weekday=weekday, starts_at=dt_time.fromisoformat(shop.opens_at), ends_at=dt_time.fromisoformat(shop.closes_at)))
+        staff.shop_id, staff.barber_id = item.shop_id, barber.id
+    db.commit()
+    return {"status": item.status}
 
 
 @app.patch("/api/shops/{shop_id}/state", response_model=ShopOut)
@@ -1047,7 +1467,6 @@ def admin_create_shop(payload: AdminShopCreate, staff: StaffUser = Depends(curre
     shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, approval_status="approved")
     db.add(shop)
     db.flush()
-    db.add(Service(shop_id=shop.id, name="Other", duration_minutes=20, price_rupees=0))
     phone = normalize_phone(payload.phone)
     if phone and db.scalar(select(StaffUser.id).where(StaffUser.phone == phone)):
         raise HTTPException(status_code=409, detail="Owner phone number is already registered")
@@ -1069,6 +1488,18 @@ def admin_approve_shop(shop_id: int, payload: ApprovalUpdate, staff: StaffUser =
     return get_shop(shop.id, db)
 
 
+@app.patch("/api/admin/shops/{shop_id}/appointments-feature", response_model=ShopOut)
+def admin_toggle_appointments(shop_id: int, payload: ShopAppointmentsFeatureUpdate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
+    require_platform_admin(staff)
+    shop = db.get(Shop, shop_id)
+    if shop is None:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    shop.appointments_enabled = payload.appointments_enabled
+    audit(db, "shop.appointments_feature_changed", staff, shop.id, f"appointments_enabled={payload.appointments_enabled}")
+    db.commit()
+    return get_shop(shop.id, db)
+
+
 @app.get("/api/marketplace/nearby", response_model=list[ShopOut])
 def nearby_shops(latitude: float, longitude: float, radius_km: float = 10, db: Session = Depends(get_db)):
     candidates = list(db.scalars(select(Shop).where(Shop.approval_status == "approved", Shop.latitude.is_not(None), Shop.longitude.is_not(None))).all())
@@ -1084,16 +1515,9 @@ def appointment_interval(item: Appointment) -> tuple[datetime, datetime]:
     return start, start + timedelta(minutes=appointment_duration(item))
 
 
-def available_barbers_for_slot(db: Session, shop_id: int, start: datetime, duration_minutes: int) -> list[Barber]:
-    end = start + timedelta(minutes=duration_minutes)
-    barbers = list(db.scalars(select(Barber).where(Barber.shop_id == shop_id, Barber.is_active.is_(True)).order_by(Barber.id)).all())
-    appointments = list(db.scalars(select(Appointment).options(joinedload(Appointment.service)).where(Appointment.shop_id == shop_id, Appointment.status.in_(("booked", "confirmed", "queued", "serving")))).all())
-    busy_ids = set()
-    for item in appointments:
-        existing_start, existing_end = appointment_interval(item)
-        if item.barber_id and existing_start < end and start < existing_end:
-            busy_ids.add(item.barber_id)
-    return [barber for barber in barbers if barber.id not in busy_ids]
+def available_barbers_for_slot(db: Session, shop_id: int, start: datetime, duration_minutes: int, service_ids: list[int], barber_id: int | None = None) -> list[Barber]:
+    shop = db.get(Shop, shop_id)
+    return eligible_barbers(db, shop, start, duration_minutes, service_ids, barber_id)
 
 
 @app.get("/api/shops/{shop_id}/appointment-slots")
@@ -1104,6 +1528,8 @@ def appointment_slots(shop_id: int, appointment_date: date, service_ids: list[in
     barber = db.get(Barber, barber_id) if barber_id else None
     if shop is None or len(services) != len(unique_service_ids) or any(service.shop_id != shop_id or not service.is_active for service in services):
         raise HTTPException(status_code=404, detail="Shop or service is unavailable")
+    if not getattr(shop, "appointments_enabled", True):
+        return {"date": appointment_date.isoformat(), "service_duration_minutes": 0, "slots": []}
     duration_minutes = sum(service.duration_minutes for service in services)
     if barber and (barber.shop_id != shop_id or not barber.is_active):
         raise HTTPException(status_code=400, detail="Selected barber is unavailable")
@@ -1121,9 +1547,9 @@ def appointment_slots(shop_id: int, appointment_date: date, service_ids: list[in
     step = timedelta(minutes=duration_minutes)
     while cursor + step <= closing:
         cursor_utc = cursor.astimezone(timezone.utc)
-        available = available_barbers_for_slot(db, shop_id, cursor_utc, duration_minutes)
+        available = available_barbers_for_slot(db, shop_id, cursor_utc, duration_minutes, unique_service_ids, barber_id)
         if cursor_utc > now and (barber in available if barber else bool(available)):
-            slots.append({"value": cursor.isoformat(), "label": cursor.strftime("%I:%M %p"), "available_barbers": len(available)})
+            slots.append({"value": cursor.isoformat(), "label": cursor.strftime("%I:%M %p"), "available_barbers": len(available), "barber_names": [item.name for item in available]})
         cursor += step
     return {"date": appointment_date.isoformat(), "service_duration_minutes": duration_minutes, "slots": slots}
 
@@ -1141,6 +1567,8 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
     barber = db.get(Barber, payload.barber_id) if payload.barber_id else None
     if shop is None or shop.approval_status != "approved" or len(services) != len(service_ids) or not services or any(item.shop_id != shop_id or not item.is_active for item in services):
         raise HTTPException(status_code=404, detail="Shop or service is unavailable")
+    if not getattr(shop, "appointments_enabled", True):
+        raise HTTPException(status_code=400, detail="Appointments are not enabled for this shop")
     total_duration = sum(item.duration_minutes for item in services)
     total_price = sum(item.price_rupees for item in services)
     service_names = ", ".join(item.name for item in services)
@@ -1170,7 +1598,7 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
         raise HTTPException(status_code=409, detail=f"Please select an appointment during shop opening hours: {shop.opens_at} to {shop.closes_at} ({shop.timezone}).")
     if barber and (barber.shop_id != shop_id or not barber.is_active):
         raise HTTPException(status_code=400, detail="Selected barber is unavailable")
-    available = available_barbers_for_slot(db, shop_id, payload.scheduled_at.astimezone(timezone.utc), total_duration)
+    available = available_barbers_for_slot(db, shop_id, payload.scheduled_at.astimezone(timezone.utc), total_duration, service_ids, payload.barber_id)
     if barber and barber not in available:
         raise HTTPException(status_code=409, detail=f"{barber.name} is unavailable for the full {total_duration}-minute booking. Choose another barber or slot.")
     if barber is None:
@@ -1178,7 +1606,7 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
             raise HTTPException(status_code=409, detail="All barbers are busy during this service slot. Choose another time.")
         barber = available[0]
     customer = optional_customer(request, db)
-    item = Appointment(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id, service_ids=service_ids, service_names=service_names, total_duration_minutes=total_duration, total_price_rupees=total_price, barber_id=barber.id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, scheduled_at=payload.scheduled_at.astimezone(timezone.utc), booking_day=booking_day, daily_booking_number=next_booking_number)
+    item = Appointment(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id, service_ids=service_ids, service_names=service_names, total_duration_minutes=total_duration, total_price_rupees=total_price, barber_id=barber.id if barber else None, barber_profile_id=barber.barber_profile_id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, scheduled_at=payload.scheduled_at.astimezone(timezone.utc), booking_day=booking_day, daily_booking_number=next_booking_number)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -1282,7 +1710,11 @@ def create_rating(payload: RatingCreate, db: Session = Depends(get_db)):
     # A single customer score updates the shop and the assigned barber.
     barber_stars = (payload.barber_stars or payload.stars) if visit.barber_id else None
     barber_comment = payload.barber_comment if visit.barber_id else None
-    db.add(Rating(shop_id=visit.shop_id, queue_entry_id=entry.id if entry else None, appointment_id=appointment.id if appointment else None, barber_id=visit.barber_id, stars=payload.stars, comment=payload.comment, barber_stars=barber_stars, barber_comment=barber_comment))
+    barber_profile_id = visit.barber_profile_id
+    if not barber_profile_id and visit.barber_id:
+        assigned_barber = db.get(Barber, visit.barber_id)
+        barber_profile_id = assigned_barber.barber_profile_id if assigned_barber else None
+    db.add(Rating(shop_id=visit.shop_id, queue_entry_id=entry.id if entry else None, appointment_id=appointment.id if appointment else None, barber_id=visit.barber_id, barber_profile_id=barber_profile_id, stars=payload.stars, comment=payload.comment, barber_stars=barber_stars, barber_comment=barber_comment))
     db.commit()
     return {"rated": True}
 

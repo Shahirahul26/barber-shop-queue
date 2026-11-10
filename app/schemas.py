@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from .models import QueueStatus
 
@@ -7,14 +7,19 @@ class LoginRequest(BaseModel):
     identifier: str | None = Field(default=None, min_length=3, max_length=255)
     email: str | None = Field(default=None, min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=128)
+    device_id: str | None = Field(default=None, min_length=16, max_length=64)
+    device_name: str | None = Field(default=None, max_length=160)
 
 
 class GoogleLoginRequest(BaseModel):
     credential: str = Field(min_length=20)
+    device_id: str | None = Field(default=None, min_length=16, max_length=64)
+    device_name: str | None = Field(default=None, max_length=160)
 
 
 class CustomerOtpRequest(BaseModel):
     identifier: str = Field(min_length=5, max_length=255)
+    device_id: str | None = Field(default=None, min_length=16, max_length=64)
 
 
 class CustomerOtpVerify(BaseModel):
@@ -24,6 +29,42 @@ class CustomerOtpVerify(BaseModel):
     age: int | None = Field(default=None, ge=5, le=110)
     gender: str | None = Field(default=None, pattern="^(male|female|non_binary|prefer_not_to_say)$")
     terms_accepted: bool = False
+    reset_mpin: bool = False
+
+
+class CustomerProfileUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    age: int = Field(ge=5, le=110)
+    gender: str = Field(pattern="^(male|female|non_binary|prefer_not_to_say)$")
+
+
+class MpinLoginRequest(BaseModel):
+    identifier: str = Field(min_length=3, max_length=255)
+    mpin: str = Field(pattern="^[0-9]{6}$")
+    device_id: str = Field(min_length=16, max_length=64)
+    device_name: str | None = Field(default=None, max_length=160)
+
+
+class CustomerMpinComplete(BaseModel):
+    verification_token: str = Field(min_length=20)
+    mpin: str = Field(pattern="^[0-9]{6}$")
+    confirm_mpin: str | None = Field(default=None, pattern="^[0-9]{6}$")
+    device_id: str = Field(min_length=16, max_length=64)
+    device_name: str | None = Field(default=None, max_length=160)
+
+
+class MpinSetRequest(BaseModel):
+    mpin: str = Field(pattern="^[0-9]{6}$")
+    confirm_mpin: str = Field(pattern="^[0-9]{6}$")
+    current_mpin: str | None = Field(default=None, pattern="^[0-9]{6}$")
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    device_id: str | None = Field(default=None, min_length=16, max_length=64)
+    device_name: str | None = Field(default=None, max_length=160)
+
+
+class DeviceCheckRequest(BaseModel):
+    identifier: str = Field(min_length=3, max_length=255)
+    device_id: str = Field(min_length=16, max_length=64)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -44,6 +85,7 @@ class TokenOut(BaseModel):
     must_change_password: bool = False
     role: str
     barber_id: int | None = None
+    requires_mpin_setup: bool = False
 
 
 class ServiceOut(BaseModel):
@@ -73,15 +115,73 @@ class BarberOut(BaseModel):
     id: int
     name: str
     is_active: bool
+    barber_number: str | None = None
+    barber_profile_id: int | None = None
+    photo_url: str | None = None
+    experience_years: int = 0
+    specialities: list[str] = []
+    career_rating: float = 0
+    career_rating_count: int = 0
+    shop_rating: float = 0
+    shop_rating_count: int = 0
 
 
 class BarberCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=20)
+    career_started_on: date | None = None
+    biography: str | None = Field(default=None, max_length=2000)
+    specialities: list[str] = Field(default_factory=list, max_length=30)
+    service_ids: list[int] = Field(default_factory=list, max_length=50)
 
 
 class BarberUpdate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     is_active: bool
+
+
+class BarberProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=100)
+    phone: str | None = Field(default=None, max_length=20)
+    email: EmailStr | None = None
+    gender: str | None = Field(default=None, max_length=30)
+    career_started_on: date | None = None
+    biography: str | None = Field(default=None, max_length=2000)
+    specialities: list[str] = Field(default_factory=list, max_length=30)
+    certifications: list[str] = Field(default_factory=list, max_length=30)
+
+
+class BarberServicesUpdate(BaseModel):
+    service_ids: list[int] = Field(min_length=1, max_length=50)
+
+
+class WeeklyAvailabilityIn(BaseModel):
+    weekday: int = Field(ge=0, le=6)
+    starts_at: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    ends_at: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    is_active: bool = True
+
+
+class WeeklyAvailabilityUpdate(BaseModel):
+    periods: list[WeeklyAvailabilityIn] = Field(max_length=42)
+
+
+class AvailabilityExceptionCreate(BaseModel):
+    exception_type: str = Field(pattern="^(leave|unavailable|emergency|holiday|extra_hours)$")
+    starts_at: datetime
+    ends_at: datetime
+    reason: str | None = Field(default=None, max_length=300)
+    approval_status: str = Field(default="approved", pattern="^(pending|approved|rejected)$")
+
+
+class BarberInvitationCreate(BaseModel):
+    barber_number: str = Field(min_length=8, max_length=20)
+    message: str | None = Field(default=None, max_length=300)
+
+
+class MembershipRequestAction(BaseModel):
+    action: str = Field(pattern="^(approve|reject)$")
 
 
 class QueueJoin(BaseModel):
@@ -132,11 +232,16 @@ class ShopOut(BaseModel):
     opens_at: str
     closes_at: str
     queue_paused: bool
+    appointments_enabled: bool = True
     photo_url: str | None
     waiting_count: int
     estimated_wait_minutes: int
     services: list[ServiceOut]
     barbers: list[BarberOut]
+
+
+class ShopAppointmentsFeatureUpdate(BaseModel):
+    appointments_enabled: bool
 
 
 class ShopUpdate(BaseModel):
@@ -147,6 +252,8 @@ class ShopUpdate(BaseModel):
     timezone: str = Field(default="Asia/Kolkata", max_length=64)
     opens_at: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
     closes_at: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class BannerUpdate(BaseModel):

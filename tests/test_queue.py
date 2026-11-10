@@ -253,14 +253,22 @@ def test_due_appointment_enters_queue_with_priority_and_stays_linked():
         assert booked["phone"] is None
         with SessionLocal() as db:
             appointment = db.get(Appointment, booked["id"])
-            service_duration = db.get(QueueEntry, walk_in["id"]).service.duration_minutes
-            appointment.scheduled_at = datetime.now(timezone.utc) + timedelta(minutes=service_duration, seconds=-1)
+            appointment.scheduled_at = datetime.now(timezone.utc) + timedelta(minutes=9, seconds=59)
             db.commit()
         queue = client.get("/api/shops/1/queue", headers=auth).json()
         priority = next(item for item in queue if item["customer_name"] == "Priority Booking")
         assert priority["source"] == "appointment"
         assert priority["token"] == booked["token"]
         assert priority["token"].startswith("B")
+        # During the early-arrival window the appointment reserves capacity but
+        # does not jump ahead until its scheduled time.
+        assert queue.index(priority) > next(index for index, item in enumerate(queue) if item["id"] == walk_in["id"])
+        with SessionLocal() as db:
+            appointment = db.get(Appointment, booked["id"])
+            appointment.scheduled_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            db.commit()
+        queue = client.get("/api/shops/1/queue", headers=auth).json()
+        priority = next(item for item in queue if item["customer_name"] == "Priority Booking")
         assert queue.index(priority) < next(index for index, item in enumerate(queue) if item["id"] == walk_in["id"])
         client.post(f"/api/queue/{priority['id']}/action", headers=auth, json={"action": "start", "barber_id": shop["barbers"][0]["id"]})
         client.post(f"/api/queue/{priority['id']}/action", headers=auth, json={"action": "complete"})
@@ -294,9 +302,10 @@ def test_staff_appointment_list_hides_past_shop_local_dates():
         assert all(item["id"] != appointment_id for item in visible.json())
 
 
-def test_customer_first_login_otp_terms_and_persistent_session():
+def test_customer_first_login_otp_mpin_and_trusted_device_session():
     with TestClient(app) as client:
-        requested = client.post("/api/customer-auth/request-otp", json={"identifier": "9876500999"})
+        device_id = "test-device-00000001"
+        requested = client.post("/api/customer-auth/request-otp", json={"identifier": "9876500999", "device_id": device_id})
         assert requested.status_code == 200
         payload = requested.json()
         assert payload["expires_in_seconds"] == 600
@@ -305,10 +314,22 @@ def test_customer_first_login_otp_terms_and_persistent_session():
         assert rejected.status_code == 422
         verified = client.post("/api/customer-auth/verify-otp", json={"identifier": "9876500999", "otp": payload["development_otp"], "name": "Verified Customer", "age": 28, "gender": "prefer_not_to_say", "terms_accepted": True})
         assert verified.status_code == 200
-        token = verified.json()["access_token"]
+        assert verified.json()["requires_mpin_setup"] is True
+        completed = client.post("/api/customer-auth/complete-mpin", json={"verification_token": verified.json()["verification_token"], "mpin": "428517", "confirm_mpin": "428517", "device_id": device_id, "device_name": "Pytest"})
+        assert completed.status_code == 200
+        token = completed.json()["access_token"]
+        checked = client.post("/api/customer-auth/check-device", json={"identifier": "9876500999", "device_id": device_id})
+        assert checked.json()["mpin_login"] is True
+        mpin_login = client.post("/api/customer-auth/login-mpin", json={"identifier": "9876500999", "mpin": "428517", "device_id": device_id})
+        assert mpin_login.status_code == 200
         me = client.get("/api/customer-auth/me", headers={"Authorization": f"Bearer {token}"})
         assert me.status_code == 200
         assert me.json()["name"] == "Verified Customer"
+        updated = client.patch("/api/customer-auth/me", headers={"Authorization": f"Bearer {token}"}, json={"name": "Updated Customer", "age": 29, "gender": "female"})
+        assert updated.status_code == 200
+        assert updated.json()["name"] == "Updated Customer"
+        assert updated.json()["age"] == 29
+        assert updated.json()["gender"] == "female"
         customer_auth = {"Authorization": f"Bearer {token}"}
         shop = client.get("/api/shops/1").json()
         visit = client.post("/api/shops/1/queue", headers=customer_auth, json={"customer_name": "Verified Customer", "phone": "9876500999", "service_id": shop["services"][0]["id"]})
@@ -321,3 +342,163 @@ def test_customer_first_login_otp_terms_and_persistent_session():
         assert history.status_code == 200
         assert history.json()[0]["service"] == shop["services"][0]["name"]
         assert history.json()[0]["barber"] == shop["barbers"][0]["name"]
+
+
+def test_no_default_service_single_service_deletion_and_future_career_start_rejection():
+    with TestClient(app) as client:
+        registered = client.post("/api/auth/register-shop", json={
+            "name": "Custom Only Salon", "address": "100 New Road",
+            "owner_name": "Custom Owner", "owner_email": "custom-owner@example.com",
+            "owner_password": "StrongPass123!", "terms_accepted": True
+        })
+        assert registered.status_code == 201
+        session = registered.json()
+        shop_id = session["shop_id"]
+        auth = {"Authorization": f"Bearer {session['access_token']}"}
+
+        shop = client.get(f"/api/shops/{shop_id}").json()
+        assert len(shop["services"]) == 0
+
+        created_service = client.post(f"/api/shops/{shop_id}/services", headers=auth, json={
+            "name": "Beard Styling", "duration_minutes": 25, "price_rupees": 200
+        })
+        assert created_service.status_code == 201
+        service_id = created_service.json()["id"]
+
+        shop = client.get(f"/api/shops/{shop_id}").json()
+        assert len(shop["services"]) == 1
+        assert shop["services"][0]["name"] == "Beard Styling"
+
+        deleted = client.delete(f"/api/services/{service_id}", headers=auth)
+        assert deleted.status_code == 200
+        assert deleted.json()["message"] == "Service deleted"
+
+        shop = client.get(f"/api/shops/{shop_id}").json()
+        assert len(shop["services"]) == 0
+
+        future_date = (datetime.now(timezone.utc).date() + timedelta(days=5)).isoformat()
+        past_date = (datetime.now(timezone.utc).date() - timedelta(days=365)).isoformat()
+
+        future_barber = client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={
+            "name": "Time Traveler", "career_started_on": future_date
+        })
+        assert future_barber.status_code == 422
+        assert "future" in future_barber.json()["detail"].lower()
+
+        valid_barber = client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={
+            "name": "Real Barber", "career_started_on": past_date
+        })
+        assert valid_barber.status_code == 201
+        assert valid_barber.json()["experience_years"] >= 1
+
+
+def test_barber_profile_weekly_availability_toggle_and_slots():
+    with TestClient(app) as client:
+        owner = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        auth = {"Authorization": f"Bearer {owner['access_token']}"}
+        shop_id = owner["shop_id"]
+        shop = client.get(f"/api/shops/{shop_id}").json()
+
+        barber = client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={
+            "name": "Alex Schedule"
+        }).json()
+        barber_id = barber["id"]
+
+        profile = client.get(f"/api/barbers/{barber_id}/profile", headers=auth).json()
+        assert len(profile["weekly_availability"]) == 7
+        for day in profile["weekly_availability"]:
+            assert day["is_active"] is True
+            assert day["starts_at"] == shop["opens_at"]
+            assert day["ends_at"] == shop["closes_at"]
+
+        new_periods = [
+            {"weekday": 0, "starts_at": "10:00", "ends_at": "19:00", "is_active": True},
+            {"weekday": 1, "starts_at": "10:00", "ends_at": "19:00", "is_active": True},
+            {"weekday": 2, "starts_at": "11:00", "ends_at": "20:00", "is_active": True},
+            {"weekday": 3, "starts_at": "10:00", "ends_at": "19:00", "is_active": True},
+            {"weekday": 4, "starts_at": "09:30", "ends_at": "18:30", "is_active": True},
+            {"weekday": 5, "starts_at": shop["opens_at"], "ends_at": shop["closes_at"], "is_active": False},
+            {"weekday": 6, "starts_at": shop["opens_at"], "ends_at": shop["closes_at"], "is_active": False},
+        ]
+        updated = client.put(f"/api/barbers/{barber_id}/availability", headers=auth, json={"periods": new_periods})
+        assert updated.status_code == 200
+        saved_profile = updated.json()
+
+        saved_days = {d["weekday"]: d for d in saved_profile["weekly_availability"]}
+        assert saved_days[0]["is_active"] is True
+        assert saved_days[0]["starts_at"] == "10:00"
+        assert saved_days[0]["ends_at"] == "19:00"
+
+        assert saved_days[2]["is_active"] is True
+        assert saved_days[2]["starts_at"] == "11:00"
+        assert saved_days[2]["ends_at"] == "20:00"
+
+        assert saved_days[5]["is_active"] is False
+        assert saved_days[6]["is_active"] is False
+
+
+def test_shop_latitude_longitude_registration_and_update():
+    with TestClient(app) as client:
+        owner = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        auth = {"Authorization": f"Bearer {owner['access_token']}"}
+        shop_id = owner["shop_id"]
+
+        # Update shop coordinates via PATCH
+        update_res = client.patch(f"/api/shops/{shop_id}", headers=auth, json={
+            "name": "Updated Shop Name",
+            "address": "123 High Street, Mumbai",
+            "phone": "9876543210",
+            "gst_number": "27ABCDE1234F1Z5",
+            "timezone": "Asia/Kolkata",
+            "opens_at": "09:00",
+            "closes_at": "20:00",
+            "latitude": 19.076090,
+            "longitude": 72.877426
+        })
+        assert update_res.status_code == 200
+        updated = update_res.json()
+        assert updated["latitude"] == 19.076090
+        assert updated["longitude"] == 72.877426
+
+        # Check nearby shops endpoint finds it
+        nearby = client.get("/api/marketplace/nearby?latitude=19.0760&longitude=72.8774&radius_km=5")
+        assert nearby.status_code == 200
+        nearby_shops = nearby.json()
+        assert any(s["id"] == shop_id for s in nearby_shops)
+
+
+def test_admin_toggle_appointments_feature():
+    with TestClient(app) as client:
+        session = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        assert session["is_platform_admin"] is True
+        auth = {"Authorization": f"Bearer {session['access_token']}"}
+
+        # Disable appointments for shop 1
+        res = client.patch("/api/admin/shops/1/appointments-feature", headers=auth, json={"appointments_enabled": False})
+        assert res.status_code == 200
+        assert res.json()["appointments_enabled"] is False
+
+        # Verify public shop endpoint returns appointments_enabled == False
+        shop = client.get("/api/shops/1").json()
+        assert shop["appointments_enabled"] is False
+
+        # Try to book appointment when disabled -> expect 400
+        future = (datetime.now(timezone.utc) + timedelta(days=1)).replace(hour=10, minute=0, second=0, microsecond=0).isoformat()
+        service_id = shop["services"][0]["id"]
+        appt_res = client.post("/api/shops/1/appointments", json={
+            "customer_name": "Test Customer",
+            "service_id": service_id,
+            "scheduled_at": future
+        })
+        assert appt_res.status_code == 400
+        assert "not enabled" in appt_res.json()["detail"].lower()
+
+        # Re-enable appointments for shop 1
+        res2 = client.patch("/api/admin/shops/1/appointments-feature", headers=auth, json={"appointments_enabled": True})
+        assert res2.status_code == 200
+        assert res2.json()["appointments_enabled"] is True
+        assert client.get("/api/shops/1").json()["appointments_enabled"] is True
+
+
+
+

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#17231c" />
     <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/static/styles.css?v=44" />
+  <link rel="stylesheet" href="/static/styles.css?v=57" />
     <title>TrimTime · Live barber queue</title>
   </head>
-  <body>
+  <body class="customer-page">
     <header class="topbar"><a class="brand" href="/">TRIM<span>TIME</span></a><nav class="topbar-actions"><a href="/staff">Staff</a><button id="show-customer-profile" type="button" class="secondary hidden">Profile</button></nav></header>
     <section id="customer-auth" class="customer-auth">
       <div class="auth-brand-visual" id="customer-auth-image"><div><p class="eyebrow" data-software-name>TRIMTIME</p><h1>Skip the waiting room.</h1><p>Scan, sign in and follow your live queue from anywhere.</p></div></div>
@@ -16,17 +16,27 @@
         <div id="otp-request-step"><p id="customer-auth-eyebrow" class="eyebrow">CUSTOMER LOGIN</p><h2 id="customer-auth-title">Continue with email or phone</h2><p id="customer-auth-copy" class="muted">We verify you once on this device. Your OTP is valid for 10 minutes.</p><form id="otp-request-form" class="single-column-form"><label>Email address or mobile number<input id="customer-identifier" autocomplete="username" required /></label><button>Next</button></form></div>
         <div id="otp-verify-step" class="hidden"><p class="eyebrow">VERIFY ACCOUNT</p><h2>Enter your OTP</h2><p id="otp-message" class="muted"></p><form id="otp-verify-form" class="single-column-form"><label>6-digit OTP<input id="customer-otp" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label><button>Next</button></form><button id="resend-customer-otp" class="forgot-link" type="button">Resend OTP</button></div>
         <div id="customer-profile-step" class="hidden"><p class="eyebrow">ONE LAST STEP</p><h2>Create your profile</h2><div id="customer-profile-ad" class="profile-ad-image"></div><form id="customer-profile-form" class="single-column-form"><label>Your name<input id="verified-customer-name" minlength="2" autocomplete="name" required /></label><label>Age<input id="verified-customer-age" type="number" min="5" max="110" required /></label><label>Gender<select id="verified-customer-gender" required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label class="terms-check"><input id="customer-terms" type="checkbox" required /><span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span></label><button>Complete registration</button></form></div>
+        <div id="customer-mpin-step" class="hidden"><p class="eyebrow">SECURE SIGN IN</p><h2 id="customer-mpin-title">Create your 6-digit MPIN</h2><p id="customer-mpin-copy" class="muted">Use this MPIN for faster sign-in on this trusted device.</p><form id="customer-mpin-form" class="single-column-form"><label>6-digit MPIN<input id="customer-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label><label id="customer-confirm-mpin-label">Confirm MPIN<input id="customer-confirm-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" /></label><button id="customer-mpin-submit">Save MPIN and continue</button></form><button id="forgot-customer-mpin" class="forgot-link hidden" type="button">Forgot MPIN? Verify with OTP</button></div>
         <p id="customer-auth-error" class="error" role="alert"></p><p id="development-otp" class="success"></p>
       </div>
     </section>
     <main id="customer-app" class="hidden">
       <div id="customer-notice" class="customer-notice hidden" role="alert" aria-live="assertive"></div>
-      <section class="hero">
+      <div id="other-shop-banner" class="other-shop-banner hidden" role="status">
+        <span id="other-shop-banner-text"></span>
+        <button id="switch-to-ticket-shop" type="button" class="secondary small">View ticket</button>
+      </div>
+      <section class="hero hidden">
+        <div class="hero-top-nav">
+          <button id="back-to-all-shops" type="button" class="back-to-shops-btn hidden">← All barber shops</button>
+          <span id="scanned-shop-badge" class="scanned-shop-badge hidden">📷 Scanned QR shop</span>
+        </div>
         <img id="customer-shop-photo" class="customer-shop-photo hidden" alt="Selected barber shop" />
         <p class="eyebrow">LIVE QUEUE · NO GUESSWORK</p>
         <h1 id="shop-name">Your cut, without the wait.</h1>
         <p id="shop-average-rating" class="shop-rating-summary">★ 0.0</p>
         <p id="shop-address" class="muted">Loading shop…</p>
+        <a id="shop-navigation-link" class="shop-nav-action hidden" target="_blank" rel="noopener"><span>🧭</span> Navigate with Google Maps</a>
         <div class="queue-card">
           <div><strong id="waiting-count">—</strong><span>waiting</span></div>
           <div><strong id="wait-time">—</strong><span>estimated minutes</span></div>
@@ -44,7 +54,7 @@
 
       <section id="history-rating-panel" class="panel hidden"><div class="section-heading"><div><h2>Rate completed service</h2></div><button id="close-history-rating" type="button" class="ghost">Close</button></div><p id="history-rating-service" class="muted"></p><form id="history-rating-form"><fieldset class="star-field"><legend>Shop rating (1–5)</legend><input id="history-shop-rating" type="hidden" /><div class="star-rating" data-rating-input="history-shop-rating" aria-label="Shop rating"><button type="button" data-rating-value="1" aria-label="1 star">★</button><button type="button" data-rating-value="2" aria-label="2 stars">★</button><button type="button" data-rating-value="3" aria-label="3 stars">★</button><button type="button" data-rating-value="4" aria-label="4 stars">★</button><button type="button" data-rating-value="5" aria-label="5 stars">★</button></div></fieldset><label>Shop feedback (optional)<textarea id="history-shop-review" maxlength="500" placeholder="Tell us about the shop"></textarea></label><button type="submit">Submit feedback</button></form><p id="history-rating-result" class="success"></p></section>
 
-      <section class="marketplace-section"><div class="section-heading"><div><p class="eyebrow">NEAR YOU</p><h2>Other barber shops</h2></div><button type="button" id="nearby-shops" class="secondary">Use my location</button></div><div id="nearby-shop-cards" class="shop-card-grid"></div></section>
+      <section class="marketplace-section" id="marketplace-section"><div class="section-heading"><div><p class="eyebrow" id="marketplace-eyebrow">NEAR YOU</p><h2 id="marketplace-title">Other barber shops</h2><p id="marketplace-subtitle" class="muted hidden">Select a shop to check live wait times, join queue, or book an appointment.</p></div><button type="button" id="nearby-shops" class="secondary">Use my location</button></div><div id="nearby-shop-cards" class="shop-card-grid"></div></section>
 
       <section id="join-panel" class="panel hidden">
         <p class="eyebrow">JOIN LIVE QUEUE</p>
@@ -62,9 +72,9 @@
       </section>
 
       <section id="appointment-panel" class="panel hidden">
-        <p class="eyebrow">PLAN AHEAD</p><h2>Book an appointment</h2>
+        <div class="section-heading"><div><p class="eyebrow">PLAN AHEAD</p><h2>Book an appointment</h2></div><button id="close-appointment-panel" type="button" class="ghost">Close ✕</button></div>
         <p id="appointment-guidance" class="muted">Choose a service and appointment time. Selecting a specific barber is optional.</p>
-        <form id="appointment-form"><label>1. Choose services<div id="appointment-service-picker" class="service-checkbox-dropdown"><button id="appointment-service-toggle" type="button" aria-expanded="false"><span>Choose services</span><b>⌄</b></button><div id="appointment-service-options" class="service-checkbox-options hidden"></div></div><small class="field-help">Select one or more services.</small></label><label>2. Choose a barber (optional)<select id="appointment-barber"></select></label><label>3. Choose a date<input id="appointment-date" type="date" required /></label><label>4. Choose an available slot<select id="appointment-slot" required><option value="">Select service and date first</option></select></label><button id="book-appointment" type="button">Book appointment</button></form>
+        <form id="appointment-form"><label>1. Choose services<div id="appointment-service-picker" class="service-checkbox-dropdown"><button id="appointment-service-toggle" type="button" aria-expanded="false"><span>Choose services</span><b>⌄</b></button><div id="appointment-service-options" class="service-checkbox-options hidden"></div></div><small class="field-help">Select one or more services.</small></label><label>2. Choose a barber (optional)<select id="appointment-barber"></select></label><label>3. Choose a date<input id="appointment-date" type="date" required /></label><div class="appointment-slot-container"><div class="slot-container-header"><label class="slot-container-label" for="appointment-slot">4. Choose an available slot</label><span id="slot-count-badge" class="slot-count-badge hidden"></span></div><input type="hidden" id="appointment-slot" required /><div id="slot-period-filters" class="slot-period-filters hidden" role="tablist" aria-label="Filter time slots"><button type="button" class="slot-filter-btn active" data-period="all">All</button><button type="button" class="slot-filter-btn" data-period="morning">🌅 Morning</button><button type="button" class="slot-filter-btn" data-period="afternoon">☀️ Afternoon</button><button type="button" class="slot-filter-btn" data-period="evening">🌙 Evening</button></div><div id="appointment-slot-status" class="appointment-slot-status">Select services and appointment date above to view available time slots</div><div id="appointment-slot-cards" class="appointment-slot-grid hidden" role="radiogroup" aria-label="Available appointment time slots"></div><div id="appointment-selected-slot-summary" class="selected-slot-summary hidden"><span class="summary-check-icon">✓</span><div class="summary-details"><span class="summary-title" id="summary-slot-time">Slot selected</span><span class="summary-barber-info" id="summary-slot-barbers"></span></div><button type="button" id="clear-selected-slot" class="clear-slot-btn" title="Choose a different slot">Change</button></div></div><button id="book-appointment" type="button">Book appointment</button></form>
         <p id="appointment-result" aria-live="polite"></p>
       </section>
 
@@ -92,7 +102,7 @@
       </section>
     </main>
     <footer>Built for calmer shops and better cuts.</footer>
-    <script src="/static/branding.js?v=1" defer></script><script src="/static/app.js?v=57" defer></script>
+    <script src="/static/branding.js?v=1" defer></script><script src="/static/app.js?v=70" defer></script>
   </body>
 </html>
 

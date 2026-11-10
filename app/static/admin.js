@@ -54,8 +54,16 @@ document.querySelector("#login-image-form").addEventListener("submit", async (ev
 
 async function loadAdminShops() {
   const shops = await adminRequest("/api/admin/shops");
-  document.querySelector("#admin-shop-list").innerHTML = shops.map((shop) => `<article class="panel admin-shop-card"><div><span class="eyebrow">${safe(shop.approval_status)}</span><h3>${safe(shop.name)}</h3><p>${safe(shop.address)}</p><small>Customer QR route: /customer?shop=${shop.id}</small></div><img src="/api/shops/${shop.id}/qr" alt="QR for ${safe(shop.name)}" /><div class="actions"><a class="button-link" href="/customer?shop=${shop.id}" target="_blank">Open</a><button data-id="${shop.id}" data-status="${shop.approval_status === "approved" ? "suspended" : "approved"}" class="secondary">${shop.approval_status === "approved" ? "Suspend" : "Approve"}</button></div><div id="admin-staff-${shop.id}" class="admin-staff-list"><small>Loading staff…</small></div></article>`).join("");
+  document.querySelector("#admin-shop-list").innerHTML = shops.map((shop) => `<article class="panel admin-shop-card"><div><span class="eyebrow">${safe(shop.approval_status)}</span><h3>${safe(shop.name)}</h3><p>${safe(shop.address)}</p><small>Customer QR route: /customer?shop=${shop.id}</small><div class="shop-admin-features" style="margin-top:10px;display:flex;align-items:center;gap:10px;"><strong style="font-size:0.85rem;">Book Appointment:</strong><button type="button" data-appointment-toggle="${shop.id}" data-enabled="${shop.appointments_enabled ? "true" : "false"}" class="${shop.appointments_enabled ? "secondary" : "ghost"}" style="padding:4px 10px;font-size:0.82rem;">${shop.appointments_enabled ? "✓ Enabled" : "✕ Disabled"}</button></div></div><img src="/api/shops/${shop.id}/qr" alt="QR for ${safe(shop.name)}" /><div class="actions"><a class="button-link" href="/customer?shop=${shop.id}" target="_blank">Open</a><button data-id="${shop.id}" data-status="${shop.approval_status === "approved" ? "suspended" : "approved"}" class="secondary">${shop.approval_status === "approved" ? "Suspend" : "Approve"}</button></div><div id="admin-staff-${shop.id}" class="admin-staff-list"><small>Loading staff…</small></div></article>`).join("");
   document.querySelectorAll("[data-status]").forEach((button) => button.addEventListener("click", async () => { await adminRequest(`/api/admin/shops/${button.dataset.id}/approval`, { method: "PATCH", body: JSON.stringify({ approval_status: button.dataset.status }) }); await loadAdminShops(); }));
+  document.querySelectorAll("[data-appointment-toggle]").forEach((button) => button.addEventListener("click", async () => {
+    const nextState = button.dataset.enabled !== "true";
+    await adminRequest(`/api/admin/shops/${button.dataset.appointmentToggle}/appointments-feature`, {
+      method: "PATCH",
+      body: JSON.stringify({ appointments_enabled: nextState })
+    });
+    await loadAdminShops();
+  }));
   await Promise.all(shops.map(async (shop) => renderAdminStaff(shop.id, await adminRequest(`/api/shops/${shop.id}/staff`))));
 }
 
@@ -93,6 +101,227 @@ document.querySelector("#new-shop-form").addEventListener("submit", async (event
   } finally {
     submitButton.disabled = false; submitButton.textContent = "Create shop and unique QR";
   }
+});
+
+function setupGeoHelper({
+  latInputId,
+  lngInputId,
+  addressInputId,
+  statusId,
+  pasteInputId,
+  applyPasteBtnId,
+  detectBtnId,
+  fromAddressBtnId,
+  openGmapsBtnId,
+  toggleMapBtnId,
+  mapContainerId,
+  mapCloseBtnId,
+  mapViewId
+}) {
+  const latInput = document.querySelector(latInputId);
+  const lngInput = document.querySelector(lngInputId);
+  const addressInput = document.querySelector(addressInputId);
+  const statusEl = document.querySelector(statusId);
+  const pasteInput = document.querySelector(pasteInputId);
+  const applyPasteBtn = document.querySelector(applyPasteBtnId);
+  const detectBtn = document.querySelector(detectBtnId);
+  const fromAddressBtn = document.querySelector(fromAddressBtnId);
+  const openGmapsBtn = document.querySelector(openGmapsBtnId);
+  const toggleMapBtn = document.querySelector(toggleMapBtnId);
+  const mapContainer = document.querySelector(mapContainerId);
+  const mapCloseBtn = document.querySelector(mapCloseBtnId);
+
+  if (!latInput || !lngInput) return;
+  let mapInstance = null, marker = null;
+
+  function setCoordinates(lat, lng, sourceLabel) {
+    latInput.value = Number(lat.toFixed(6));
+    lngInput.value = Number(lng.toFixed(6));
+    if (statusEl) {
+      statusEl.className = "geo-status-msg success";
+      statusEl.textContent = `✓ ${sourceLabel}: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
+    if (mapInstance && marker) {
+      marker.setLatLng([lat, lng]);
+      mapInstance.setView([lat, lng], 16);
+    }
+  }
+
+  function parseCoordinatesOrUrl(input) {
+    if (!input) return null;
+    const str = input.trim();
+    const directMatch = /^(-?\d{1,2}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)$/.exec(str);
+    if (directMatch) {
+      const lat = parseFloat(directMatch[1]), lng = parseFloat(directMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { latitude: lat, longitude: lng };
+    }
+    const atMatch = /@(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/.exec(str);
+    if (atMatch) {
+      const lat = parseFloat(atMatch[1]), lng = parseFloat(atMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { latitude: lat, longitude: lng };
+    }
+    const queryMatch = /[?&](?:q|query|ll|destination)=(-?\d{1,2}(?:\.\d+)?)[,\s]+(-?\d{1,3}(?:\.\d+)?)/.exec(str);
+    if (queryMatch) {
+      const lat = parseFloat(queryMatch[1]), lng = parseFloat(queryMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { latitude: lat, longitude: lng };
+    }
+    const genericMatch = /(-?\d{1,2}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})/.exec(str);
+    if (genericMatch) {
+      const lat = parseFloat(genericMatch[1]), lng = parseFloat(genericMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { latitude: lat, longitude: lng };
+    }
+    return null;
+  }
+
+  if (detectBtn) {
+    detectBtn.addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        if (statusEl) {
+          statusEl.className = "geo-status-msg error";
+          statusEl.textContent = "Browser geolocation is not supported on this device.";
+        }
+        return;
+      }
+      if (statusEl) {
+        statusEl.className = "geo-status-msg";
+        statusEl.textContent = "Detecting GPS location…";
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCoordinates(pos.coords.latitude, pos.coords.longitude, "Current GPS location captured"),
+        (err) => {
+          if (statusEl) {
+            statusEl.className = "geo-status-msg error";
+            statusEl.textContent = `Location unavailable (${err.message}).`;
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
+  }
+
+  if (fromAddressBtn && addressInput) {
+    fromAddressBtn.addEventListener("click", async () => {
+      const address = addressInput.value.trim();
+      if (!address || address.length < 3) {
+        if (statusEl) {
+          statusEl.className = "geo-status-msg error";
+          statusEl.textContent = "Please enter an address first.";
+        }
+        return;
+      }
+      if (statusEl) {
+        statusEl.className = "geo-status-msg";
+        statusEl.textContent = "Searching coordinates for address…";
+      }
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`, { headers: { "Accept-Language": "en" } });
+        const list = await res.json();
+        if (!list || !list.length) throw new Error("Could not find coordinates for this address.");
+        setCoordinates(parseFloat(list[0].lat), parseFloat(list[0].lon), "Coordinates found for address");
+      } catch (e) {
+        if (statusEl) {
+          statusEl.className = "geo-status-msg error";
+          statusEl.textContent = e.message || "Failed to locate address.";
+        }
+      }
+    });
+  }
+
+  if (openGmapsBtn) {
+    openGmapsBtn.addEventListener("click", () => {
+      const address = addressInput ? addressInput.value.trim() : "";
+      const url = address
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+        : (latInput.value && lngInput.value)
+          ? `https://www.google.com/maps/search/?api=1&query=${latInput.value},${lngInput.value}`
+          : "https://www.google.com/maps";
+      window.open(url, "_blank");
+      if (statusEl) {
+        statusEl.className = "geo-status-msg";
+        statusEl.textContent = "Google Maps opened. Locate shop, copy coordinates/link, and paste below.";
+      }
+    });
+  }
+
+  function applyPaste() {
+    if (!pasteInput) return;
+    const parsed = parseCoordinatesOrUrl(pasteInput.value);
+    if (parsed) {
+      setCoordinates(parsed.latitude, parsed.longitude, "Google Maps coordinates applied");
+      pasteInput.value = "";
+    } else {
+      if (statusEl) {
+        statusEl.className = "geo-status-msg error";
+        statusEl.textContent = "Could not parse coordinates. Example: 19.0760, 72.8777 or paste full Google Maps URL.";
+      }
+    }
+  }
+  if (applyPasteBtn) applyPasteBtn.addEventListener("click", applyPaste);
+  if (pasteInput) {
+    pasteInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyPaste();
+      }
+    });
+  }
+
+  if (toggleMapBtn && mapContainer) {
+    toggleMapBtn.addEventListener("click", () => {
+      mapContainer.classList.toggle("hidden");
+      if (mapContainer.classList.contains("hidden")) return;
+      if (typeof window.L === "undefined") {
+        if (statusEl) {
+          statusEl.className = "geo-status-msg error";
+          statusEl.textContent = "Interactive map tile service is loading or unavailable.";
+        }
+        return;
+      }
+      const currentLat = parseFloat(latInput.value) || 20.5937;
+      const currentLng = parseFloat(lngInput.value) || 78.9629;
+      const hasCoords = Boolean(latInput.value && lngInput.value);
+
+      if (!mapInstance) {
+        mapInstance = window.L.map(mapViewId).setView([currentLat, currentLng], hasCoords ? 15 : 5);
+        window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap"
+        }).addTo(mapInstance);
+        marker = window.L.marker([currentLat, currentLng], { draggable: true }).addTo(mapInstance);
+        const onPinChange = (pos) => setCoordinates(pos.lat, pos.lng, "Map pin placed");
+        marker.on("dragend", () => onPinChange(marker.getLatLng()));
+        mapInstance.on("click", (e) => {
+          marker.setLatLng(e.latlng);
+          onPinChange(e.latlng);
+        });
+      } else {
+        if (hasCoords) {
+          marker.setLatLng([currentLat, currentLng]);
+          mapInstance.setView([currentLat, currentLng], 15);
+        }
+      }
+      setTimeout(() => mapInstance.invalidateSize(), 200);
+    });
+  }
+  if (mapCloseBtn && mapContainer) {
+    mapCloseBtn.addEventListener("click", () => mapContainer.classList.add("hidden"));
+  }
+}
+
+setupGeoHelper({
+  latInputId: "#new-shop-latitude",
+  lngInputId: "#new-shop-longitude",
+  addressInputId: "#new-shop-address",
+  statusId: "#admin-geo-status",
+  pasteInputId: "#admin-geo-paste",
+  applyPasteBtnId: "#admin-geo-apply-paste",
+  detectBtnId: "#admin-geo-detect",
+  fromAddressBtnId: "#admin-geo-from-address",
+  openGmapsBtnId: "#admin-open-gmaps",
+  toggleMapBtnId: "#admin-toggle-map",
+  mapContainerId: "#admin-map-container",
+  mapCloseBtnId: "#admin-map-close",
+  mapViewId: "admin-map-view"
 });
 
 if (adminToken) showAdmin().catch((reason) => error.textContent = reason.message);
