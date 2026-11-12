@@ -26,3 +26,4 @@ def downgrade() -> None:
     columns = [col["name"] for col in insp.get_columns("shops")]
     if "appointments_enabled" in columns:
         op.drop_column("shops", "appointments_enabled")
+
