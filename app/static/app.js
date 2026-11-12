@@ -257,9 +257,8 @@ async function requestOtp(identifier, resetMpin = false) {
         try { window.recaptchaVerifier.clear(); } catch {}
         window.recaptchaVerifier = null;
       }
-      const useVisible = Boolean(window.useVisibleRecaptcha);
       window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
-        size: useVisible ? "normal" : "invisible",
+        size: "invisible",
         callback: () => {}
       });
       await window.recaptchaVerifier.render();
@@ -284,15 +283,14 @@ async function requestOtp(identifier, resetMpin = false) {
       const code = firebaseErr.code || "";
       let msg = firebaseErr.message || "Failed to send SMS OTP via Firebase.";
       if (code === "auth/captcha-check-failed" || code === "auth/invalid-app-credential") {
-        window.useVisibleRecaptcha = true;
         const currentHost = location.hostname;
         if (currentHost === "127.0.0.1") {
-          msg = "reCAPTCHA failed on 127.0.0.1. Please open the website as 'http://localhost:8000' instead (or add '127.0.0.1' to Firebase Console -> Authentication -> Settings -> Authorized domains).";
+          msg = "reCAPTCHA failed on 127.0.0.1. Please open the website as 'http://localhost:8000' (or add '127.0.0.1' to Firebase Console -> Authentication -> Settings -> Authorized domains).";
         } else {
-          msg = `reCAPTCHA failed. Please ensure '${currentHost}' is added in Firebase Console -> Authentication -> Settings -> Authorized domains, disable any ad-blockers, and click Next again to verify.`;
+          msg = `reCAPTCHA blocked by Google: domain '${currentHost}' is not authorized. Please add '${currentHost}' in Firebase Console -> Authentication -> Settings -> Authorized domains, then refresh the page.`;
         }
       } else if (code === "auth/unauthorized-domain") {
-        msg = `Domain '${location.hostname}' is not authorized. Go to Firebase Console -> Authentication -> Settings -> Authorized domains -> Add '${location.hostname}'.`;
+        msg = `Domain '${location.hostname}' is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains -> click 'Add domain' and enter '${location.hostname}'.`;
       } else if (code === "auth/operation-not-allowed") {
         if (firebaseErr.message && (firebaseErr.message.includes("region") || firebaseErr.message.includes("SMS unable to be sent"))) {
           msg = "SMS Region is blocked by Google! Go to Firebase Console -> Authentication -> Settings -> SMS Regions policy -> Enable India (+91).";
