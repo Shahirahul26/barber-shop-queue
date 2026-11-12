@@ -24,6 +24,7 @@ class Settings:
     smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "").rstrip(",").strip()
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    fast2sms_api_key: str = os.getenv("FAST2SMS_API_KEY", "").strip()
 
 
 settings = Settings()
