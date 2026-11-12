@@ -251,26 +251,46 @@ async function requestOtp(identifier, resetMpin = false) {
   if (isPhone && hasFirebase) {
     try {
       const e164 = formatE164Phone(identifier);
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
-          size: "invisible",
-          callback: () => {}
-        });
+      if (window.recaptchaVerifier) {
+        try { window.recaptchaVerifier.clear(); } catch {}
+        window.recaptchaVerifier = null;
       }
+      window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
+        size: "invisible",
+        callback: () => {}
+      });
       const confirmationResult = await firebase.auth().signInWithPhoneNumber(e164, window.recaptchaVerifier);
       firebaseConfirmationResult = confirmationResult;
       isFirebaseMode = true;
       pendingIdentifier = identifier;
       document.querySelector("#otp-request-step").classList.add("hidden");
       document.querySelector("#otp-verify-step").classList.remove("hidden");
-      document.querySelector("#otp-message").textContent = `SMS code sent to ${e164} via Google verification.`;
+      document.querySelector("#otp-message").textContent = `SMS verification code sent to ${e164}.`;
       document.querySelector("#development-otp").textContent = "";
       return;
     } catch (firebaseErr) {
-      console.warn("Firebase phone auth fallback:", firebaseErr);
-      if (window.recaptchaVerifier && window.grecaptcha) {
-        try { grecaptcha.reset(); } catch {}
+      console.error("Firebase phone auth error:", firebaseErr);
+      if (window.recaptchaVerifier) {
+        try { window.recaptchaVerifier.clear(); } catch {}
+        window.recaptchaVerifier = null;
       }
+      isFirebaseMode = false;
+      const code = firebaseErr.code || "";
+      let msg = firebaseErr.message || "Failed to send SMS OTP via Firebase.";
+      if (code === "auth/operation-not-allowed") {
+        msg = "Phone provider is DISABLED in Firebase. Go to Firebase Console -> Authentication -> Sign-in method -> Phone -> Toggle Enable -> Save.";
+      } else if (code === "auth/unauthorized-domain") {
+        msg = `Domain '${location.hostname}' is not authorized. Go to Firebase Console -> Authentication -> Settings -> Authorized domains -> Add '${location.hostname}'.`;
+      } else if (code === "auth/invalid-phone-number") {
+        msg = "Invalid phone number format. Please enter a valid 10-digit mobile number.";
+      } else if (code === "auth/quota-exceeded") {
+        msg = "Firebase SMS quota exceeded. Check your Firebase Console usage.";
+      } else if (code === "auth/captcha-check-failed") {
+        msg = "reCAPTCHA verification failed. Please refresh the page and try again.";
+      } else if (code === "auth/app-not-authorized") {
+        msg = "This domain/app is not authorized in Firebase. Check Authorized Domains in Firebase Console.";
+      }
+      throw new Error(msg);
     }
   }
 
