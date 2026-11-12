@@ -710,7 +710,7 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, background
         db.commit()
         reset_url = f"{str(request.base_url).rstrip('/')}/staff?reset_token={raw_token}"
         background_tasks.add_task(send_password_reset_email, user.email, reset_url)
-        if settings.environment != "production" and not smtp_is_configured():
+        if settings.environment != "production":
             response["development_reset_url"] = reset_url
     return response
 

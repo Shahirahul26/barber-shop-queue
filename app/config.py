@@ -17,11 +17,11 @@ class Settings:
     vapid_public_key: str = os.getenv("VAPID_PUBLIC_KEY", "")
     vapid_private_key: str = os.getenv("VAPID_PRIVATE_KEY", "")
     vapid_subject: str = os.getenv("VAPID_SUBJECT", "mailto:owner@example.com")
-    smtp_host: str = os.getenv("SMTP_HOST", "")
-    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
-    smtp_username: str = os.getenv("SMTP_USERNAME", "")
-    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
-    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "")
+    smtp_host: str = os.getenv("SMTP_HOST", "").rstrip(",").strip()
+    smtp_port: int = int("".join(c for c in os.getenv("SMTP_PORT", "587") if c.isdigit()) or 587)
+    smtp_username: str = os.getenv("SMTP_USERNAME", "").rstrip(",").strip()
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "").rstrip(",").strip()
+    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "").rstrip(",").strip()
     smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
 
