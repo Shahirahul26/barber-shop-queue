@@ -1,12 +1,13 @@
 // Firebase Phone Auth Configuration (10,000 Free SMS / month)
 // Get these values from: Firebase Console -> Project Settings -> General -> Your apps -> Web app
 window.firebaseConfig = {
-  apiKey: "AawNgEquBlJoqom7tOFWBC7xQgAxUiYNRQhsmTQn7kRDOTNPbUmcotSzHjUsmp2lwpwHuyPvs4P9WzFEtchh-ALkuHIJxvufnVKT3zAYYAKD6DhdWVqpUFfkFIN5F50qisMqT3AtCp_NdFa7Uh8Y0w6OJg",
-  authDomain: "trimtime-barber.firebaseapp.com",
-  projectId: "trimtime",
-  storageBucket: "trimtime-barber.appspot.com",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBDiWZIBupDF9OTqyAd1vjoxmhOrbOc9-c",
+  authDomain: "trimtime-web.firebaseapp.com",
+  projectId: "trimtime-web",
+  storageBucket: "trimtime-web.firebasestorage.app",
+  messagingSenderId: "1044327958918",
+  appId: "1:1044327958918:web:2dd94374d2a3937706c407",
+  measurementId: "G-4RNETZK2QN"
 };
 
 (function initFirebase() {
