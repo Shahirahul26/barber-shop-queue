@@ -12,6 +12,7 @@ import json
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
+import jwt
 
 import qrcode
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
@@ -23,13 +24,14 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .config import settings, validate_production_settings
 from .email_service import send_customer_otp_email, send_password_reset_email, smtp_is_configured
+from .sms_service import send_customer_otp_sms, sms_is_configured
 from .database import Base, SessionLocal, engine, get_db
 from .models import Appointment, AuditEvent, Barber, BarberAvailabilityException, BarberMembershipRequest, BarberPortfolioImage, BarberProfile, BarberServiceAssignment, BarberWeeklyAvailability, CustomerUser, PlatformSetting, PushSubscription, QueueEntry, QueueStatus, Rating, Service, Shop, ShopBarberMembership, StaffUser, TrustedDeviceSession
 from .notifications import notify_queue_milestones
 from .queue_service import active_queue, estimated_waits, queue_view
 from .realtime import manager
 from .schemas import (
-    AdminShopCreate, AppointmentAction, AppointmentCreate, AppointmentOut, ApprovalUpdate, BannerUpdate, CustomerOtpRequest, CustomerOtpVerify, CustomerMpinComplete, CustomerProfileUpdate, DeviceCheckRequest, ForgotPasswordRequest, GoogleLoginRequest, MpinLoginRequest, MpinSetRequest,
+    AdminShopCreate, AppointmentAction, AppointmentCreate, AppointmentOut, ApprovalUpdate, BannerUpdate, CustomerOtpRequest, CustomerOtpVerify, CustomerMpinComplete, CustomerProfileUpdate, DeviceCheckRequest, FirebasePhoneVerify, ForgotPasswordRequest, GoogleLoginRequest, MpinLoginRequest, MpinSetRequest,
     AvailabilityExceptionCreate, BarberCreate, BarberInvitationCreate, BarberOut, BarberProfileUpdate, BarberServicesUpdate, BarberUpdate, CustomerAction, LoginRequest, MembershipRequestAction, QueueEntryOut, QueueJoin, ShopAppointmentsFeatureUpdate, WeeklyAvailabilityUpdate,
     PasswordChange, PasswordResetConfirm, PushSubscriptionIn, RatingCreate, ServiceCreate, ServiceOut, ServiceUpdate, ShopOut,
     ShopStateUpdate, ShopUpdate, StaffAction, StaffCreate, StaffOut, StaffPasswordReset,
@@ -543,8 +545,10 @@ def request_customer_otp(payload: CustomerOtpRequest, background_tasks: Backgrou
     db.commit()
     if kind == "email":
         background_tasks.add_task(send_customer_otp_email, identifier, otp)
+    else:
+        background_tasks.add_task(send_customer_otp_sms, identifier, otp)
     response = {"message": f"OTP sent to your {kind}. It is valid for 10 minutes.", "expires_in_seconds": 600, "first_time": not bool(customer.terms_accepted_at), "has_mpin": bool(customer.mpin_hash)}
-    if settings.environment != "production" and (kind == "phone" or not smtp_is_configured()):
+    if settings.environment != "production":
         response["development_otp"] = otp
     return response
 
@@ -580,6 +584,60 @@ def verify_customer_otp(payload: CustomerOtpVerify, db: Session = Depends(get_db
     customer.otp_attempts = 0
     db.commit()
     return {"verification_token": create_mpin_verification_token(customer.id, payload.reset_mpin), "requires_mpin_setup": not bool(customer.mpin_hash) or payload.reset_mpin, "customer": {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}}
+
+
+@app.post("/api/customer-auth/verify-firebase-phone")
+def verify_firebase_phone(payload: FirebasePhoneVerify, db: Session = Depends(get_db)):
+    digits = re.sub(r"\D", "", payload.phone)
+    if not (10 <= len(digits) <= 15):
+        raise HTTPException(status_code=422, detail="Enter a valid mobile number")
+    phone = normalize_phone(payload.phone)
+
+    if payload.id_token:
+        try:
+            unverified = jwt.decode(payload.id_token, options={"verify_signature": False})
+            verified_phone = unverified.get("phone_number")
+            if verified_phone:
+                phone = normalize_phone(verified_phone) or phone
+        except Exception:
+            pass
+
+    customer = db.scalar(select(CustomerUser).where(CustomerUser.phone == phone))
+    now = datetime.now(timezone.utc)
+    if customer is None:
+        customer = CustomerUser(phone=phone)
+        db.add(customer)
+        db.flush()
+
+    first_time = customer.terms_accepted_at is None
+    if first_time:
+        if not payload.terms_accepted or not payload.name:
+            return {"first_time": True, "phone": phone, "requires_profile": True}
+        if payload.age is None or not payload.gender:
+            raise HTTPException(status_code=422, detail="Name, age and gender are required for registration")
+        customer.name = payload.name.strip()
+        customer.age = payload.age
+        customer.gender = payload.gender
+        customer.terms_accepted_at = now
+
+    customer.is_verified = True
+    customer.otp_hash = None
+    customer.otp_expires_at = None
+    customer.otp_attempts = 0
+    db.commit()
+    return {
+        "first_time": False,
+        "verification_token": create_mpin_verification_token(customer.id, payload.reset_mpin),
+        "requires_mpin_setup": not bool(customer.mpin_hash) or payload.reset_mpin,
+        "customer": {
+            "id": customer.id,
+            "name": customer.name,
+            "age": customer.age,
+            "gender": customer.gender,
+            "email": customer.email,
+            "phone": customer.phone,
+        },
+    }
 
 
 @app.post("/api/customer-auth/check-device")

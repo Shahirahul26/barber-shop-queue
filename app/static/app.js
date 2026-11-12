@@ -229,8 +229,53 @@ async function restoreCustomerSession() {
   if (!response.ok) { sessionStorage.removeItem("trimtimeCustomerToken"); customerToken = null; return; }
   showCustomerApp(await response.json());
 }
+let firebaseConfirmationResult = null, firebaseIdToken = null, isFirebaseMode = false;
+
+function isPhoneIdentifier(val) {
+  return !val.includes("@") && Boolean(val.replace(/\D/g, "").length >= 10);
+}
+
+function formatE164Phone(val) {
+  const digits = val.replace(/\D/g, "");
+  if (val.trim().startsWith("+")) return "+" + digits;
+  if (digits.length === 10) return "+91" + digits;
+  if (digits.length === 12 && digits.startsWith("91")) return "+" + digits;
+  return "+" + digits;
+}
+
 async function requestOtp(identifier, resetMpin = false) {
   resetCustomerMpin = resetMpin;
+  const isPhone = isPhoneIdentifier(identifier);
+  const hasFirebase = Boolean(window.firebase && window.firebase.apps && window.firebase.apps.length > 0 && window.firebaseConfig && window.firebaseConfig.apiKey);
+
+  if (isPhone && hasFirebase) {
+    try {
+      const e164 = formatE164Phone(identifier);
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
+          size: "invisible",
+          callback: () => {}
+        });
+      }
+      const confirmationResult = await firebase.auth().signInWithPhoneNumber(e164, window.recaptchaVerifier);
+      firebaseConfirmationResult = confirmationResult;
+      isFirebaseMode = true;
+      pendingIdentifier = identifier;
+      document.querySelector("#otp-request-step").classList.add("hidden");
+      document.querySelector("#otp-verify-step").classList.remove("hidden");
+      document.querySelector("#otp-message").textContent = `SMS code sent to ${e164} via Google verification.`;
+      document.querySelector("#development-otp").textContent = "";
+      return;
+    } catch (firebaseErr) {
+      console.warn("Firebase phone auth fallback:", firebaseErr);
+      if (window.recaptchaVerifier && window.grecaptcha) {
+        try { grecaptcha.reset(); } catch {}
+      }
+    }
+  }
+
+  isFirebaseMode = false;
+  firebaseConfirmationResult = null;
   const response = await fetch("/api/customer-auth/request-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier, device_id: customerDeviceId }) });
   const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail));
   firstTimeCustomer = body.first_time;
@@ -253,8 +298,54 @@ function showCustomerMpin(mode) {
 }
 document.querySelector("#otp-request-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; pendingIdentifier = document.querySelector("#customer-identifier").value.trim(); try { const check = await fetch("/api/customer-auth/check-device", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: pendingIdentifier, device_id: customerDeviceId }) }).then((response) => response.json()); if (check.mpin_login && customerAuthMode !== "signup") showCustomerMpin("login"); else await requestOtp(pendingIdentifier); } catch (reason) { authError.textContent = reason.message; } });
 document.querySelector("#resend-customer-otp").addEventListener("click", async () => { const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; try { await requestOtp(pendingIdentifier); } catch (reason) { authError.textContent = reason.message; } });
-async function completeOtpVerification(profile = {}) { const response = await fetch("/api/customer-auth/verify-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: pendingIdentifier, otp: pendingOtp, reset_mpin: resetCustomerMpin, ...profile }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail)); customerMpinVerification = body.verification_token; showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify"); }
-document.querySelector("#otp-verify-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; pendingOtp = document.querySelector("#customer-otp").value; try { if (firstTimeCustomer) { document.querySelector("#otp-verify-step").classList.add("hidden"); document.querySelector("#customer-profile-step").classList.remove("hidden"); } else await completeOtpVerification(); } catch (reason) { authError.textContent = reason.message; } });
+async function completeOtpVerification(profile = {}) {
+  if (isFirebaseMode) {
+    const payload = {
+      phone: pendingIdentifier,
+      id_token: firebaseIdToken,
+      reset_mpin: resetCustomerMpin,
+      ...profile
+    };
+    const response = await fetch("/api/customer-auth/verify-firebase-phone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(formatApiError(body.detail));
+    if (body.requires_profile) {
+      document.querySelector("#otp-verify-step").classList.add("hidden");
+      document.querySelector("#customer-profile-step").classList.remove("hidden");
+      return;
+    }
+    customerMpinVerification = body.verification_token;
+    showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify");
+    return;
+  }
+  const response = await fetch("/api/customer-auth/verify-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: pendingIdentifier, otp: pendingOtp, reset_mpin: resetCustomerMpin, ...profile }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail)); customerMpinVerification = body.verification_token; showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify");
+}
+document.querySelector("#otp-verify-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const authError = document.querySelector("#customer-auth-error");
+  authError.textContent = "";
+  pendingOtp = document.querySelector("#customer-otp").value.trim();
+  try {
+    if (isFirebaseMode && firebaseConfirmationResult) {
+      const cred = await firebaseConfirmationResult.confirm(pendingOtp);
+      firebaseIdToken = await cred.user.getIdToken();
+      await completeOtpVerification();
+      return;
+    }
+    if (firstTimeCustomer) {
+      document.querySelector("#otp-verify-step").classList.add("hidden");
+      document.querySelector("#customer-profile-step").classList.remove("hidden");
+    } else {
+      await completeOtpVerification();
+    }
+  } catch (reason) {
+    authError.textContent = reason.message || "Invalid OTP code";
+  }
+});
 document.querySelector("#customer-profile-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; try { await completeOtpVerification({ name: document.querySelector("#verified-customer-name").value.trim(), age: Number(document.querySelector("#verified-customer-age").value), gender: document.querySelector("#verified-customer-gender").value, terms_accepted: document.querySelector("#customer-terms").checked }); } catch (reason) { authError.textContent = reason.message; } });
 document.querySelector("#customer-mpin-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; const mpin = document.querySelector("#customer-mpin").value; try { const path = customerMpinMode === "login" ? "/api/customer-auth/login-mpin" : "/api/customer-auth/complete-mpin"; const payload = customerMpinMode === "login" ? { identifier: pendingIdentifier, mpin, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) } : { verification_token: customerMpinVerification, mpin, confirm_mpin: document.querySelector("#customer-confirm-mpin").value || null, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) }; const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail)); customerToken = body.access_token; sessionStorage.setItem("trimtimeCustomerToken", customerToken); showCustomerApp(body.customer); } catch (reason) { authError.textContent = reason.message; } });
 document.querySelector("#forgot-customer-mpin").addEventListener("click", async () => { const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; try { document.querySelector("#customer-mpin-step").classList.add("hidden"); await requestOtp(pendingIdentifier, true); } catch (reason) { authError.textContent = reason.message; } });

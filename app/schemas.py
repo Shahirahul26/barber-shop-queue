@@ -32,6 +32,16 @@ class CustomerOtpVerify(BaseModel):
     reset_mpin: bool = False
 
 
+class FirebasePhoneVerify(BaseModel):
+    phone: str = Field(min_length=10, max_length=20)
+    id_token: str | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    age: int | None = Field(default=None, ge=5, le=110)
+    gender: str | None = Field(default=None, pattern="^(male|female|non_binary|prefer_not_to_say)$")
+    terms_accepted: bool = False
+    reset_mpin: bool = False
+
+
 class CustomerProfileUpdate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     age: int = Field(ge=5, le=110)

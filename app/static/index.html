@@ -18,6 +18,7 @@
         <div id="customer-profile-step" class="hidden"><p class="eyebrow">ONE LAST STEP</p><h2>Create your profile</h2><div id="customer-profile-ad" class="profile-ad-image"></div><form id="customer-profile-form" class="single-column-form"><label>Your name<input id="verified-customer-name" minlength="2" autocomplete="name" required /></label><label>Age<input id="verified-customer-age" type="number" min="5" max="110" required /></label><label>Gender<select id="verified-customer-gender" required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><label class="terms-check"><input id="customer-terms" type="checkbox" required /><span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span></label><button>Complete registration</button></form></div>
         <div id="customer-mpin-step" class="hidden"><p class="eyebrow">SECURE SIGN IN</p><h2 id="customer-mpin-title">Create your 6-digit MPIN</h2><p id="customer-mpin-copy" class="muted">Use this MPIN for faster sign-in on this trusted device.</p><form id="customer-mpin-form" class="single-column-form"><label>6-digit MPIN<input id="customer-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label><label id="customer-confirm-mpin-label">Confirm MPIN<input id="customer-confirm-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" /></label><button id="customer-mpin-submit">Save MPIN and continue</button></form><button id="forgot-customer-mpin" class="forgot-link hidden" type="button">Forgot MPIN? Verify with OTP</button></div>
         <p id="customer-auth-error" class="error" role="alert"></p><p id="development-otp" class="success"></p>
+        <div id="recaptcha-container"></div>
       </div>
     </section>
     <main id="customer-app" class="hidden">
@@ -102,7 +103,10 @@
       </section>
     </main>
     <footer>Built for calmer shops and better cuts.</footer>
-    <script src="/static/branding.js?v=1" defer></script><script src="/static/app.js?v=70" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="/static/firebase-config.js?v=1"></script>
+    <script src="/static/branding.js?v=1" defer></script><script src="/static/app.js?v=71" defer></script>
   </body>
 </html>
 
