@@ -13,7 +13,7 @@ class Settings:
     access_token_minutes: int = int(os.getenv("ACCESS_TOKEN_MINUTES", "480"))
     admin_email: str = os.getenv("ADMIN_EMAIL", "owner@example.com")
     admin_password: str = os.getenv("ADMIN_PASSWORD", "ChangeMe123!")
-    allowed_hosts: tuple[str, ...] = tuple(item.strip() for item in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if item.strip())
+    allowed_hosts: tuple[str, ...] = tuple(item.strip() for item in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,*.onrender.com").split(",") if item.strip())
     vapid_public_key: str = os.getenv("VAPID_PUBLIC_KEY", "")
     vapid_private_key: str = os.getenv("VAPID_PRIVATE_KEY", "")
     vapid_subject: str = os.getenv("VAPID_SUBJECT", "mailto:owner@example.com")
