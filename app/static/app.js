@@ -251,14 +251,18 @@ async function requestOtp(identifier, resetMpin = false) {
   if (isPhone && hasFirebase) {
     try {
       const e164 = formatE164Phone(identifier);
+      const rcContainer = document.querySelector("#recaptcha-container");
+      if (rcContainer) rcContainer.innerHTML = "";
       if (window.recaptchaVerifier) {
         try { window.recaptchaVerifier.clear(); } catch {}
         window.recaptchaVerifier = null;
       }
+      const useVisible = Boolean(window.useVisibleRecaptcha);
       window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
-        size: "invisible",
+        size: useVisible ? "normal" : "invisible",
         callback: () => {}
       });
+      await window.recaptchaVerifier.render();
       const confirmationResult = await firebase.auth().signInWithPhoneNumber(e164, window.recaptchaVerifier);
       firebaseConfirmationResult = confirmationResult;
       isFirebaseMode = true;
@@ -274,23 +278,33 @@ async function requestOtp(identifier, resetMpin = false) {
         try { window.recaptchaVerifier.clear(); } catch {}
         window.recaptchaVerifier = null;
       }
+      const rcContainer = document.querySelector("#recaptcha-container");
+      if (rcContainer) rcContainer.innerHTML = "";
       isFirebaseMode = false;
       const code = firebaseErr.code || "";
       let msg = firebaseErr.message || "Failed to send SMS OTP via Firebase.";
-      if (code === "auth/operation-not-allowed") {
+      if (code === "auth/captcha-check-failed" || code === "auth/invalid-app-credential") {
+        window.useVisibleRecaptcha = true;
+        const currentHost = location.hostname;
+        if (currentHost === "127.0.0.1") {
+          msg = "reCAPTCHA failed on 127.0.0.1. Please open the website as 'http://localhost:8000' instead (or add '127.0.0.1' to Firebase Console -> Authentication -> Settings -> Authorized domains).";
+        } else {
+          msg = `reCAPTCHA failed. Please ensure '${currentHost}' is added in Firebase Console -> Authentication -> Settings -> Authorized domains, disable any ad-blockers, and click Next again to verify.`;
+        }
+      } else if (code === "auth/unauthorized-domain") {
+        msg = `Domain '${location.hostname}' is not authorized. Go to Firebase Console -> Authentication -> Settings -> Authorized domains -> Add '${location.hostname}'.`;
+      } else if (code === "auth/operation-not-allowed") {
         if (firebaseErr.message && (firebaseErr.message.includes("region") || firebaseErr.message.includes("SMS unable to be sent"))) {
           msg = "SMS Region is blocked by Google! Go to Firebase Console -> Authentication -> Settings -> SMS Regions policy -> Enable India (+91).";
         } else {
           msg = "Phone provider or SMS Region is disabled in Firebase. Enable Phone and SMS Region Policy in Firebase Console.";
         }
-      } else if (code === "auth/unauthorized-domain") {
-        msg = `Domain '${location.hostname}' is not authorized. Go to Firebase Console -> Authentication -> Settings -> Authorized domains -> Add '${location.hostname}'.`;
       } else if (code === "auth/invalid-phone-number") {
         msg = "Invalid phone number format. Please enter a valid 10-digit mobile number.";
       } else if (code === "auth/quota-exceeded") {
         msg = "Firebase SMS quota exceeded. Check your Firebase Console usage.";
-      } else if (code === "auth/captcha-check-failed") {
-        msg = "reCAPTCHA verification failed. Please refresh the page and try again.";
+      } else if (code === "auth/too-many-requests") {
+        msg = "Too many requests sent. Please wait a few minutes before trying again.";
       } else if (code === "auth/app-not-authorized") {
         msg = "This domain/app is not authorized in Firebase. Check Authorized Domains in Firebase Console.";
       }
