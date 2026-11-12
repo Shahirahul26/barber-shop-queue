@@ -278,7 +278,11 @@ async function requestOtp(identifier, resetMpin = false) {
       const code = firebaseErr.code || "";
       let msg = firebaseErr.message || "Failed to send SMS OTP via Firebase.";
       if (code === "auth/operation-not-allowed") {
-        msg = "Phone provider is DISABLED in Firebase. Go to Firebase Console -> Authentication -> Sign-in method -> Phone -> Toggle Enable -> Save.";
+        if (firebaseErr.message && (firebaseErr.message.includes("region") || firebaseErr.message.includes("SMS unable to be sent"))) {
+          msg = "SMS Region is blocked by Google! Go to Firebase Console -> Authentication -> Settings -> SMS Regions policy -> Enable India (+91).";
+        } else {
+          msg = "Phone provider or SMS Region is disabled in Firebase. Enable Phone and SMS Region Policy in Firebase Console.";
+        }
       } else if (code === "auth/unauthorized-domain") {
         msg = `Domain '${location.hostname}' is not authorized. Go to Firebase Console -> Authentication -> Settings -> Authorized domains -> Add '${location.hostname}'.`;
       } else if (code === "auth/invalid-phone-number") {
