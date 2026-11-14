@@ -394,8 +394,30 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
   finally { button.disabled = false; button.textContent = "Sign in"; }
 });
 
-document.querySelector("#show-registration").addEventListener("click", () => { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#registration-panel").classList.remove("hidden"); });
-document.querySelector("#back-to-login").addEventListener("click", () => { document.querySelector("#registration-panel").classList.add("hidden"); document.querySelector("#login-panel").classList.remove("hidden"); });
+document.querySelector("#show-registration").addEventListener("click", () => {
+  document.querySelector("#login-panel").classList.add("hidden");
+  document.querySelector("#registration-panel").classList.remove("hidden");
+  document.querySelector("#tab-staff-register")?.classList.add("active");
+  document.querySelector("#tab-staff-signin")?.classList.remove("active");
+});
+document.querySelector("#back-to-login").addEventListener("click", () => {
+  document.querySelector("#registration-panel").classList.add("hidden");
+  document.querySelector("#login-panel").classList.remove("hidden");
+  document.querySelector("#tab-staff-signin")?.classList.add("active");
+  document.querySelector("#tab-staff-register")?.classList.remove("active");
+});
+document.querySelector("#tab-staff-signin")?.addEventListener("click", () => {
+  document.querySelector("#registration-panel").classList.add("hidden");
+  document.querySelector("#login-panel").classList.remove("hidden");
+  document.querySelector("#tab-staff-signin")?.classList.add("active");
+  document.querySelector("#tab-staff-register")?.classList.remove("active");
+});
+document.querySelector("#tab-staff-register")?.addEventListener("click", () => {
+  document.querySelector("#login-panel").classList.add("hidden");
+  document.querySelector("#registration-panel").classList.remove("hidden");
+  document.querySelector("#tab-staff-register")?.classList.add("active");
+  document.querySelector("#tab-staff-signin")?.classList.remove("active");
+});
 if (!accessToken && new URLSearchParams(location.search).get("auth") === "signup") document.querySelector("#show-registration").click();
 document.querySelector("#show-forgot-password").addEventListener("click", () => { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#forgot-password-panel").classList.remove("hidden"); });
 document.querySelectorAll(".back-to-login").forEach((button) => button.addEventListener("click", () => { document.querySelector("#forgot-password-panel").classList.add("hidden"); document.querySelector("#staff-mpin-login-panel").classList.add("hidden"); document.querySelector("#login-panel").classList.remove("hidden"); }));
@@ -460,6 +482,9 @@ function logout() {
 
 async function showBoard() {
   document.querySelector("#login-panel").classList.add("hidden");
+  document.querySelector("#registration-panel").classList.add("hidden");
+  document.querySelector("#staff-banner")?.classList.add("hidden");
+  document.querySelector("#staff-auth-tabs-wrap")?.classList.add("hidden");
   document.querySelector("#dashboard").classList.remove("hidden");
   resetDashboardTabs();
   document.querySelector("#settings-forgot-identifier").value = sessionStorage.getItem("trimtimeLoginIdentifier") || "";

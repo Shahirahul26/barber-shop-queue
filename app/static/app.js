@@ -60,10 +60,37 @@ document.querySelector("#shop-rating").closest(".star-field").insertAdjacentHTML
 customerHero.insertAdjacentElement("afterend", joinPanel);
 joinPanel.insertAdjacentElement("afterend", document.querySelector("#appointment-panel"));
 document.querySelector("#customer-app").appendChild(document.querySelector(".marketplace-section"));
+let currentCustomerAuthMode = customerAuthMode === "signup" ? "signup" : "signin";
+
+function setCustomerAuthMode(mode) {
+  currentCustomerAuthMode = mode;
+  document.querySelector("#auth-tab-signin")?.classList.toggle("active", mode === "signin");
+  document.querySelector("#auth-tab-signup")?.classList.toggle("active", mode === "signup");
+  document.querySelector("#auth-tab-signin")?.setAttribute("aria-selected", String(mode === "signin"));
+  document.querySelector("#auth-tab-signup")?.setAttribute("aria-selected", String(mode === "signup"));
+
+  const eyebrow = document.querySelector("#customer-auth-eyebrow");
+  const title = document.querySelector("#customer-auth-title");
+  const copy = document.querySelector("#customer-auth-copy");
+  const submitBtn = document.querySelector("#send-otp-button");
+
+  if (mode === "signup") {
+    if (eyebrow) eyebrow.textContent = "NEW CUSTOMER";
+    if (title) title.textContent = "Create customer account";
+    if (copy) copy.textContent = "Enter your email address. We will verify it with a 10-minute OTP, then complete your profile.";
+    if (submitBtn) submitBtn.innerHTML = "Get started with OTP <span>→</span>";
+  } else {
+    if (eyebrow) eyebrow.textContent = "CUSTOMER ACCESS";
+    if (title) title.textContent = "Sign in with email";
+    if (copy) copy.textContent = "Enter your email address to receive a secure OTP code. You only need to verify once on this device.";
+    if (submitBtn) submitBtn.innerHTML = "Send verification code <span>→</span>";
+  }
+}
+
+document.querySelector("#auth-tab-signin")?.addEventListener("click", () => setCustomerAuthMode("signin"));
+document.querySelector("#auth-tab-signup")?.addEventListener("click", () => setCustomerAuthMode("signup"));
 if (customerAuthMode === "signup") {
-  document.querySelector("#customer-auth-eyebrow").textContent = "NEW CUSTOMER";
-  document.querySelector("#customer-auth-title").textContent = "Create your customer account";
-  document.querySelector("#customer-auth-copy").textContent = "Enter your email or phone number. We will verify it with a 10-minute OTP, then create your profile.";
+  setCustomerAuthMode("signup");
 }
 
 function formatApiError(detail) {
@@ -266,8 +293,11 @@ async function requestOtp(identifier, resetMpin = false) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(formatApiError(body.detail));
   firstTimeCustomer = body.first_time;
-  if (customerAuthMode === "signin" && firstTimeCustomer) throw new Error("No customer account found for this email. Please return and choose New customer? Sign up.");
-  if (customerAuthMode === "signup" && !firstTimeCustomer) throw new Error("This customer account already exists. Please choose Customer sign in.");
+  if (currentCustomerAuthMode === "signin" && firstTimeCustomer) {
+    setCustomerAuthMode("signup");
+  } else if (currentCustomerAuthMode === "signup" && !firstTimeCustomer) {
+    setCustomerAuthMode("signin");
+  }
   pendingIdentifier = cleanEmail;
   document.querySelector("#otp-request-step").classList.add("hidden");
   document.querySelector("#otp-verify-step").classList.remove("hidden");
@@ -735,25 +765,88 @@ if (switchTicketBtn) {
   });
 }
 
-async function joinCurrentShop() {
-  const error = document.querySelector("#form-error"); error.textContent = "";
-  try {
-    if (currentShop.queue_paused) throw new Error("This shop has temporarily paused new queue joins.");
-    const entry = await api(`/api/shops/${shopId}/queue`, { method: "POST", body: JSON.stringify({ customer_name: currentCustomer.name, phone: currentCustomer.phone || null, service_id: null, barber_id: null, source: "online" }) });
-    activeToken = entry.public_token; localStorage.setItem("trimtimeQueueToken", activeToken);
-    const apptPanel = document.querySelector("#appointment-panel");
-    if (apptPanel) apptPanel.classList.add("hidden");
-    showTicket(entry); await loadShop(); ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (reason) {
-    error.textContent = reason.message; showCustomerNotice(reason.message);
-    if (reason.message.includes("three non-completed live-queue joins") && "Notification" in window && Notification.permission === "granted") new Notification("Queue limit reached", { body: reason.message });
+function populateJoinForm() {
+  const nameInput = document.querySelector("#customer-name");
+  if (nameInput && currentCustomer && currentCustomer.name) {
+    nameInput.value = currentCustomer.name;
+  }
+  const phoneInput = document.querySelector("#phone");
+  if (phoneInput && currentCustomer && currentCustomer.phone) {
+    phoneInput.value = currentCustomer.phone;
+  }
+  if (currentShop && currentShop.services) {
+    fillSelect("#service", [{ id: "", name: "-- Select a service (mandatory) --" }, ...currentShop.services], (item) => item.id ? `${item.name} · ${item.duration_minutes} min · ₹${item.price_rupees}` : item.name);
+    renderJoinServiceCards(currentShop.services);
+  }
+  if (currentShop && currentShop.barbers) {
+    fillSelect("#barber", [{ id: "", name: "Any available barber" }, ...currentShop.barbers], (item) => item.name);
   }
 }
+
+function renderJoinServiceCards(services) {
+  const container = document.querySelector("#join-services-grid");
+  if (!container) return;
+  const select = document.querySelector("#service");
+
+  if (!services || !services.length) {
+    container.innerHTML = '<p class="muted">No services currently listed for this shop.</p>';
+    return;
+  }
+
+  container.innerHTML = services.map((s) => `
+    <div class="service-card-choice" data-service-id="${s.id}" data-duration="${s.duration_minutes}" data-price="${s.price_rupees}" data-name="${escapeHtml(s.name)}">
+      <div class="choice-check">✓</div>
+      <div class="choice-main">
+        <strong>${escapeHtml(s.name)}</strong>
+        <div class="choice-badges">
+          <span class="choice-duration">⏱️ ${s.duration_minutes} min</span>
+          <span class="choice-price">₹${s.price_rupees}</span>
+        </div>
+      </div>
+    </div>
+  `).join("");
+
+  container.querySelectorAll(".service-card-choice").forEach((card) => {
+    card.addEventListener("click", () => {
+      container.querySelectorAll(".service-card-choice").forEach((c) => c.classList.remove("selected"));
+      card.classList.add("selected");
+      const serviceId = card.dataset.serviceId;
+      select.value = serviceId;
+
+      const banner = document.querySelector("#join-selected-service-banner");
+      if (banner) {
+        banner.classList.remove("hidden");
+        document.querySelector("#join-selected-service-name").textContent = card.dataset.name;
+        document.querySelector("#join-selected-service-meta").textContent = `${card.dataset.duration} mins · ₹${card.dataset.price}`;
+        const baseWait = Number(currentShop?.estimated_wait_minutes || 0);
+        document.querySelector("#join-service-est-wait").textContent = `~${baseWait} min wait`;
+      }
+      document.querySelector("#form-error").textContent = "";
+    });
+  });
+}
+
 document.querySelector("#show-join-options").addEventListener("click", () => {
+  if (currentQueueEntry && (currentQueueEntry.status === "waiting" || currentQueueEntry.status === "serving") && currentQueueEntry.shop_id === shopId) {
+    showCustomerNotice(`You already have an active ticket in the live queue.`);
+    showTicket(currentQueueEntry);
+    ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
   const apptPanel = document.querySelector("#appointment-panel");
   if (apptPanel) apptPanel.classList.add("hidden");
-  joinCurrentShop();
+  joinPanel.classList.remove("hidden");
+  populateJoinForm();
+  joinPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
+
+const closeJoinBtn = document.querySelector("#close-join-panel");
+if (closeJoinBtn) {
+  closeJoinBtn.addEventListener("click", () => {
+    joinPanel.classList.add("hidden");
+  });
+}
+
 document.querySelector("#show-appointment-options").addEventListener("click", () => {
   const appointmentPanel = document.querySelector("#appointment-panel");
   appointmentPanel.classList.remove("hidden");
@@ -1253,11 +1346,19 @@ document.querySelector("#join-form").addEventListener("submit", async (event) =>
     });
     activeToken = entry.public_token;
     localStorage.setItem("trimtimeQueueToken", activeToken);
+    joinPanel.classList.add("hidden");
     showTicket(entry);
     await loadShop();
+    ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (message) {
     error.textContent = message.message;
     showCustomerNotice(message.message);
+    if (message.message && (message.message.includes("active ticket") || message.message.includes("already have an active"))) {
+      joinPanel.classList.add("hidden");
+      await loadShop();
+      if (activeToken) await refreshTicket();
+      ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 });
 

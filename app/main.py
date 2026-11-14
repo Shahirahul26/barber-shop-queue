@@ -38,7 +38,7 @@ from .schemas import (
     StaffProfileUpdate, StaffStatusUpdate, TokenOut,
 )
 from .security import create_access_token, create_customer_token, create_mpin_verification_token, current_staff, decode_access_token, hash_password, verify_password
-from .scheduling import barber_provides_services, eligible_barbers, next_reservation, scheduled_windows, shop_window, shop_zone
+from .scheduling import barber_provides_services, calculate_available_slots_fast, eligible_barbers, next_reservation, scheduled_windows, shop_window, shop_zone
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -1168,6 +1168,16 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
     if customer:
         # Lock the verified customer row so simultaneous requests cannot bypass the limit.
         db.execute(select(CustomerUser.id).where(CustomerUser.id == customer.id).with_for_update()).scalar_one()
+        active_in_shop = db.scalar(select(QueueEntry).where(
+            QueueEntry.shop_id == shop_id,
+            QueueEntry.status.in_([QueueStatus.WAITING, QueueStatus.SERVING]),
+            QueueEntry.customer_id == customer.id
+        ))
+        if active_in_shop:
+            raise HTTPException(
+                status_code=409,
+                detail=f"You already have an active ticket (#{active_in_shop.token_display}) in this shop's queue. Please view your active ticket on screen or cancel it before joining again."
+            )
         identity_filters.append(QueueEntry.customer_id == customer.id)
         if customer.phone:
             identity_filters.append(QueueEntry.phone == customer.phone)
@@ -1187,7 +1197,7 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
                 QueueEntry.source == "online",
                 QueueEntry.joined_at >= day_start_utc,
                 QueueEntry.joined_at < next_day_start_utc,
-                QueueEntry.status != QueueStatus.COMPLETED,
+                QueueEntry.status.in_([QueueStatus.WAITING, QueueStatus.SERVING, QueueStatus.COMPLETED]),
                 or_(*identity_filters),
             )
         ) or 0
@@ -1627,24 +1637,9 @@ def appointment_slots(shop_id: int, appointment_date: date, service_ids: list[in
     duration_minutes = sum(service.duration_minutes for service in services)
     if barber and (barber.shop_id != shop_id or not barber.is_active):
         raise HTTPException(status_code=400, detail="Selected barber is unavailable")
-    try:
-        shop_timezone = ZoneInfo(shop.timezone)
-    except ZoneInfoNotFoundError:
-        shop_timezone = timezone.utc
-    opening = datetime.combine(appointment_date, dt_time.fromisoformat(shop.opens_at), tzinfo=shop_timezone)
-    closing = datetime.combine(appointment_date, dt_time.fromisoformat(shop.closes_at), tzinfo=shop_timezone)
-    if closing <= opening:
-        closing += timedelta(days=1)
-    now = datetime.now(timezone.utc)
-    slots = []
-    cursor = opening
-    step = timedelta(minutes=duration_minutes)
-    while cursor + step <= closing:
-        cursor_utc = cursor.astimezone(timezone.utc)
-        available = available_barbers_for_slot(db, shop_id, cursor_utc, duration_minutes, unique_service_ids, barber_id)
-        if cursor_utc > now and (barber in available if barber else bool(available)):
-            slots.append({"value": cursor.isoformat(), "label": cursor.strftime("%I:%M %p"), "available_barbers": len(available), "barber_names": [item.name for item in available]})
-        cursor += step
+    slots = calculate_available_slots_fast(
+        db, shop, appointment_date, duration_minutes, unique_service_ids, barber_id
+    )
     return {"date": appointment_date.isoformat(), "service_duration_minutes": duration_minutes, "slots": slots}
 
 

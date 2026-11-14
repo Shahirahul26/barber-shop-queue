@@ -1152,3 +1152,230 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   margin: 0;
   font-size: 0.9rem;
 }
+
+/* ==========================================================================
+   Modern UI Overhaul: Customer Auth, Staff Auth & Live Queue Experience
+   ========================================================================== */
+
+/* Customer Auth Tab Switcher */
+.auth-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #edf4f1;
+  padding: 5px;
+  border-radius: 14px;
+  margin-bottom: 22px;
+}
+.auth-tab-btn {
+  padding: 11px 16px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  font-weight: 750;
+  font-size: 0.92rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.auth-tab-btn.active {
+  background: var(--ink);
+  color: white;
+  box-shadow: 0 4px 14px rgba(16, 44, 39, 0.22);
+}
+
+/* Staff Auth Tab Switcher */
+.staff-auth-tabs-wrap {
+  width: min(1100px, 92vw);
+  margin: 22px auto 14px;
+  display: flex;
+  justify-content: center;
+}
+.staff-auth-tabs {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  background: #111827;
+  border: 1px solid #1f293d;
+  padding: 6px;
+  border-radius: 14px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+.staff-tab-btn {
+  padding: 12px 24px;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.staff-tab-btn.active {
+  background: #1e293b;
+  color: #fbbf24;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.staff-tab-btn:hover:not(.active) {
+  color: #f8fafc;
+}
+
+/* Interactive Service Selection Cards in Join Queue */
+.join-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.service-card-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.service-card-choice:hover {
+  border-color: var(--green);
+  background: #fbfdfc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(31, 90, 79, 0.08);
+}
+.service-card-choice.selected {
+  border-color: #15803d;
+  background: #f0fdf4;
+  box-shadow: 0 4px 18px rgba(22, 101, 52, 0.15);
+}
+.choice-check {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: transparent;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.service-card-choice.selected .choice-check {
+  background: #15803d;
+  border-color: #15803d;
+  color: white;
+}
+.choice-main strong {
+  display: block;
+  font: 750 0.95rem "Manrope", sans-serif;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.choice-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+.choice-duration {
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.choice-price {
+  color: #15803d;
+  font-weight: 800;
+}
+
+/* Join Queue Selected Banner */
+.join-selected-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+.join-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.join-banner-left strong {
+  display: block;
+  font-size: 0.98rem;
+  color: #14532d;
+}
+.join-banner-left small {
+  color: #166534;
+  font-weight: 600;
+}
+.est-wait-pill {
+  background: #166534;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+/* Customer Hero & Action Buttons */
+.customer-primary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+.customer-primary-actions button {
+  min-height: 52px;
+  border-radius: 14px;
+  font: 800 1rem "Manrope", sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+.customer-primary-actions button#show-join-options {
+  background: var(--lime) !important;
+  color: var(--ink) !important;
+  border: 0;
+  box-shadow: 0 4px 16px rgba(216, 237, 99, 0.35);
+}
+.customer-primary-actions button#show-join-options:hover {
+  background: #c8e34f !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(216, 237, 99, 0.45);
+}
+.customer-primary-actions button#show-appointment-options {
+  background: white !important;
+  color: var(--ink) !important;
+  border: 1.5px solid var(--line);
+}
+.customer-primary-actions button#show-appointment-options:hover {
+  background: #f6f4ed !important;
+  border-color: var(--ink);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .customer-primary-actions {
+    grid-template-columns: 1fr;
+  }
+  .join-services-grid {
+    grid-template-columns: 1fr;
+  }
+  .staff-auth-tabs {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+}

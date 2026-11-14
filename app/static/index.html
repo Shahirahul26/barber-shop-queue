@@ -25,6 +25,11 @@
         </div>
       </div>
       <div class="panel customer-auth-card">
+        <div class="auth-mode-tabs" role="tablist" aria-label="Customer sign in or sign up">
+          <button type="button" id="auth-tab-signin" class="auth-tab-btn active" role="tab" aria-selected="true">Sign In</button>
+          <button type="button" id="auth-tab-signup" class="auth-tab-btn" role="tab" aria-selected="false">New Customer? Sign Up</button>
+        </div>
+
         <div id="otp-request-step">
           <p id="customer-auth-eyebrow" class="eyebrow">CUSTOMER ACCESS</p>
           <h2 id="customer-auth-title">Sign in with email</h2>
@@ -144,20 +149,45 @@
       <section class="marketplace-section" id="marketplace-section"><div class="section-heading"><div><p class="eyebrow" id="marketplace-eyebrow">NEAR YOU</p><h2 id="marketplace-title">Other barber shops</h2><p id="marketplace-subtitle" class="muted hidden">Select a shop to check live wait times, join queue, or book an appointment.</p></div><button type="button" id="nearby-shops" class="secondary">Use my location</button></div><div id="nearby-shop-cards" class="shop-card-grid"></div></section>
 
       <section id="join-panel" class="panel hidden">
-        <p class="eyebrow">JOIN LIVE QUEUE</p>
-        <h2>Join live queue now</h2>
+        <div class="section-heading">
+          <div><p class="eyebrow">JOIN LIVE QUEUE</p><h2>Select service & join live queue</h2></div>
+          <button id="close-join-panel" type="button" class="ghost">Close ✕</button>
+        </div>
+        <p class="muted">Select your haircut, beard trim, or combo. Your wait time is dynamically calculated and updated minute-by-minute.</p>
         <form id="join-form">
           <select id="shop" class="hidden" required></select>
-          <label>Your name<input id="customer-name" required minlength="2" autocomplete="name" /></label>
-          <label>Mobile number (for updates)<input id="phone" required minlength="10" inputmode="tel" autocomplete="tel" /></label>
-          <label>Choose a service <span class="mandatory-star">*Required</span>
-            <select id="service" required>
+          <div class="form-row-2">
+            <label>Your name <span class="mandatory-star">*</span>
+              <input id="customer-name" required minlength="2" autocomplete="name" placeholder="Full name" />
+            </label>
+            <label>Mobile number (for updates) <span class="mandatory-star">*</span>
+              <input id="phone" required minlength="10" inputmode="tel" autocomplete="tel" placeholder="10-digit number" />
+            </label>
+          </div>
+
+          <label>Select service <span class="mandatory-star">*Mandatory</span>
+            <select id="service" required class="hidden">
               <option value="">-- Select a service (mandatory) --</option>
             </select>
+            <div id="join-services-grid" class="join-services-grid"></div>
           </label>
-          <label>Choose a barber (optional)<select id="barber"></select></label>
+
+          <div id="join-selected-service-banner" class="join-selected-banner hidden">
+            <div class="join-banner-left">
+              <span class="banner-icon">✂️</span>
+              <div>
+                <strong id="join-selected-service-name">Classic Haircut</strong>
+                <small id="join-selected-service-meta">25 min · ₹250</small>
+              </div>
+            </div>
+            <span class="est-wait-pill" id="join-service-est-wait">~12 min wait</span>
+          </div>
+
+          <label>Choose a preferred barber (optional)
+            <select id="barber"></select>
+          </label>
           <span id="prejoin-wait" class="hidden">0</span>
-          <button type="submit">Join live queue <span>→</span></button>
+          <button type="submit" id="join-queue-submit-btn">Confirm & Join Live Queue <span>→</span></button>
         </form>
         <p id="form-error" class="error" role="alert"></p>
       </section>
