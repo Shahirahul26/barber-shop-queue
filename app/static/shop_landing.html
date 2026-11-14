@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TrimTime for Barber Shops: The complete live queue, appointment scheduling, and chair management system for modern barber shops and salons." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+  <title>TrimTime for Shops · Keep Every Chair Moving</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f293d;
+      --gold: #f59e0b;
+      --gold-light: #fbbf24;
+      --gold-dark: #d97706;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #38bdf8;
+      --green: #10b981;
+      --green-bg: #064e3b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+    button, a { font: inherit; }
+
+    /* Header */
+    .shop-header {
+      width: min(1200px, 92vw);
+      height: 90px;
+      margin: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font: 900 1.2rem "Manrope", sans-serif;
+      letter-spacing: -0.02em;
+    }
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: #000;
+      font-weight: 900;
+      font-size: 1.1rem;
+    }
+    .shop-tag {
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--gold-light);
+      letter-spacing: 0.08em;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .shop-nav {
+      display: flex;
+      gap: 28px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .shop-nav a:hover { color: var(--gold-light); }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .customer-link {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      transition: all 0.2s;
+    }
+    .customer-link:hover {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    .signin-link {
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.9rem;
+      padding: 8px 16px;
+    }
+    .signin-link:hover { color: var(--gold-light); }
+    .cta-btn-primary {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: #000;
+      font-weight: 800;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.25);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .cta-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+    }
+
+    /* Hero */
+    .shop-hero {
+      width: min(1200px, 92vw);
+      margin: auto;
+      padding: 75px 0 90px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 60px;
+      align-items: center;
+    }
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: var(--gold);
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 24px;
+    }
+    .shop-hero h1 {
+      font: 900 clamp(2.6rem, 5vw, 4.4rem)/1.05 "Manrope", sans-serif;
+      letter-spacing: -0.04em;
+      margin-bottom: 20px;
+    }
+    .shop-hero h1 em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      margin-bottom: 36px;
+      max-width: 560px;
+      line-height: 1.6;
+    }
+
+    /* Action Card */
+    .shop-action-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+      max-width: 520px;
+    }
+    .action-box-head {
+      margin-bottom: 16px;
+    }
+    .action-box-head small {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--gold-light);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .action-box-head h3 {
+      font: 800 1.25rem "Manrope", sans-serif;
+      color: var(--text);
+    }
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .btn-register-shop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+      color: #000;
+      font-weight: 800;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+    .btn-register-shop:hover {
+      box-shadow: 0 4px 18px rgba(245, 158, 11, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-staff-login {
+      display: grid;
+      place-items: center;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      font-weight: 700;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .btn-staff-login:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .mpin-direct-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: background 0.2s;
+    }
+    .mpin-direct-bar:hover {
+      background: rgba(56, 189, 248, 0.14);
+    }
+
+    .hero-badges {
+      display: flex;
+      gap: 20px;
+      margin-top: 24px;
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-weight: 700;
+    }
+    .hero-badges span::before {
+      content: "✓ ";
+      color: var(--green);
+    }
+
+    /* Dashboard Mockup */
+    .dashboard-mockup {
+      position: relative;
+    }
+    .mockup-shell {
+      background: #131c2e;
+      border: 1px solid #23334f;
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+    }
+    .mockup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #23334f;
+      margin-bottom: 20px;
+    }
+    .mockup-title {
+      font: 800 1.05rem "Manrope", sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+    }
+    .mockup-stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .m-stat {
+      background: #0b111e;
+      border: 1px solid #1f2b42;
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .m-stat small {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .m-stat strong {
+      font: 800 1.45rem "Manrope", sans-serif;
+      color: var(--gold-light);
+    }
+
+    .chair-cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .chair-card {
+      background: #0b111e;
+      border: 1px solid #1f2b42;
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chair-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .chair-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--gold);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+    .chair-details strong {
+      font-size: 0.95rem;
+      display: block;
+      color: var(--text);
+    }
+    .chair-details span {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+    .chair-status-tag {
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 5px 12px;
+      border-radius: 999px;
+    }
+    .status-serving {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-next {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .status-booked {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--gold-light);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* Strip */
+    .shop-strip {
+      background: #111827;
+      border-top: 1px solid var(--card-border);
+      border-bottom: 1px solid var(--card-border);
+      padding: 24px 0;
+    }
+    .strip-content {
+      width: min(1200px, 92vw);
+      margin: auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+    .strip-item strong {
+      display: block;
+      font: 800 1.25rem "Manrope", sans-serif;
+      color: var(--gold-light);
+    }
+    .strip-item span {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Features Grid */
+    .section-wrap {
+      width: min(1200px, 92vw);
+      margin: auto;
+      padding: 100px 0;
+    }
+    .section-head {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 60px;
+    }
+    .section-head p.kicker {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--gold);
+      letter-spacing: 0.15em;
+      margin-bottom: 12px;
+    }
+    .section-head h2 {
+      font: 900 clamp(2.2rem, 4vw, 3.4rem)/1.15 "Manrope", sans-serif;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+    .section-head p.desc {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 32px 28px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+    .feature-card.highlight {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    .f-icon {
+      font-size: 2.2rem;
+      margin-bottom: 18px;
+      display: inline-block;
+    }
+    .feature-card h3 {
+      font: 800 1.25rem "Manrope", sans-serif;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    /* Journey */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .step-card {
+      background: #111827;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 32px;
+      position: relative;
+    }
+    .step-num {
+      font: 900 2.2rem "Manrope", sans-serif;
+      color: rgba(245, 158, 11, 0.25);
+      position: absolute;
+      top: 24px;
+      right: 28px;
+    }
+    .step-card h3 {
+      font: 800 1.2rem "Manrope", sans-serif;
+      margin: 18px 0 10px;
+    }
+    .step-card p {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+    }
+
+    /* Testimonials */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .t-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 36px;
+    }
+    .t-stars {
+      color: var(--gold);
+      font-size: 1.2rem;
+      margin-bottom: 14px;
+      letter-spacing: 0.1em;
+    }
+    .t-card blockquote {
+      font: 600 1.12rem/1.5 "Manrope", sans-serif;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+    .t-author {
+      font-weight: 800;
+      font-size: 0.92rem;
+      color: var(--gold-light);
+    }
+    .t-shop {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+
+    /* Final CTA */
+    .shop-final-cta {
+      background: linear-gradient(135deg, #182234 0%, #0d131f 100%);
+      border-top: 1px solid var(--card-border);
+      padding: 90px 5vw;
+      text-align: center;
+    }
+    .shop-final-cta h2 {
+      font: 900 clamp(2.4rem, 4.5vw, 3.8rem)/1.15 "Manrope", sans-serif;
+      margin-bottom: 16px;
+    }
+    .shop-final-cta p {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      max-width: 620px;
+      margin: 0 auto 36px;
+    }
+    .final-btns {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .final-btns a {
+      min-width: 230px;
+      text-align: center;
+    }
+
+    /* Footer */
+    .shop-footer {
+      width: min(1200px, 92vw);
+      margin: auto;
+      padding: 55px 0 35px;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr auto;
+      gap: 30px;
+      align-items: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .footer-desc {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      margin-top: 8px;
+    }
+    .footer-links-col {
+      display: flex;
+      gap: 24px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .footer-links-col a:hover { color: var(--gold-light); }
+    .customer-portal-banner {
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .customer-portal-banner a {
+      color: #ffffff;
+      text-decoration: underline;
+      margin-left: 6px;
+    }
+    .footer-bottom {
+      grid-column: 1 / -1;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    @media (max-width: 960px) {
+      .shop-hero { grid-template-columns: 1fr; padding-top: 45px; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .strip-content { grid-template-columns: 1fr 1fr; }
+      .shop-footer { grid-template-columns: 1fr; }
+      .shop-nav { display: none; }
+    }
+    @media (max-width: 600px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .testimonials-grid { grid-template-columns: 1fr; }
+      .strip-content { grid-template-columns: 1fr; }
+      .action-grid { grid-template-columns: 1fr; }
+      .mockup-stats-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="shop-header">
+    <div class="brand-wrap">
+      <div class="brand-mark">T</div>
+      <span>TrimTime</span>
+      <span class="shop-tag">FOR SHOPS</span>
+    </div>
+    <nav class="shop-nav" aria-label="Shop Owner Navigation">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#testimonials">Reviews</a>
+      <a href="/staff?auth=signin">Staff Sign In</a>
+    </nav>
+    <div class="header-actions">
+      <a class="customer-link" href="/customer" title="Looking for a haircut? Open customer view">Customer App ↗</a>
+      <a class="signin-link" href="/staff?auth=signin">Sign In</a>
+      <a class="cta-btn-primary" href="/staff?auth=signup">Register Shop <span>→</span></a>
+    </div>
+  </header>
+
+  <main>
+    <section class="shop-hero">
+      <div class="hero-text">
+        <div class="hero-kicker">💈 THE BARBER SHOP & SALON OPERATING SYSTEM</div>
+        <h1>Less waiting chaos.<br /><em>More paying chairs.</em></h1>
+        <p class="hero-sub">Coordinate walk-ins and scheduled appointments in one smart sequence. Track active chair times minute-by-minute, eliminate crowded waiting benches, and run your shop with total clarity.</p>
+
+        <div class="shop-action-box">
+          <div class="action-box-head">
+            <small>SHOP ONBOARDING & ACCESS</small>
+            <h3>Launch your barber shop in under 2 minutes</h3>
+          </div>
+          <div class="action-grid">
+            <a href="/staff?auth=signup" class="btn-register-shop">
+              <span>Register My Shop</span>
+              <span>→</span>
+            </a>
+            <a href="/staff?auth=signin" class="btn-staff-login">
+              <span>Staff Sign In</span>
+            </a>
+          </div>
+          <a href="/staff?auth=signin" class="mpin-direct-bar">
+            <span>⚡ Barber Quick MPIN Sign In (Floor Access) →</span>
+          </a>
+        </div>
+
+        <div class="hero-badges">
+          <span>Instant storefront QR</span>
+          <span>Zero hardware needed</span>
+          <span>Unified FIFO sequence</span>
+        </div>
+      </div>
+
+      <div class="dashboard-mockup">
+        <div class="mockup-shell">
+          <div class="mockup-header">
+            <div class="mockup-title">
+              <span class="live-dot"></span>
+              <span>Live Shop Dashboard</span>
+            </div>
+            <span style="font-size: 0.8rem; color: var(--gold-light); font-weight: 700;">3 Active Chairs</span>
+          </div>
+
+          <div class="mockup-stats-row">
+            <div class="m-stat">
+              <small>Today's Sales</small>
+              <strong>₹8,450</strong>
+            </div>
+            <div class="m-stat">
+              <small>Served Today</small>
+              <strong>24 cuts</strong>
+            </div>
+            <div class="m-stat">
+              <small>Live Wait</small>
+              <strong>12 mins</strong>
+            </div>
+          </div>
+
+          <div class="chair-cards-list">
+            <div class="chair-card">
+              <div class="chair-info">
+                <div class="chair-badge">01</div>
+                <div class="chair-details">
+                  <strong>Rahul · Master Fade + Beard</strong>
+                  <span>Serving Vikram · 8 mins remaining (17m elapsed)</span>
+                </div>
+              </div>
+              <span class="chair-status-tag status-serving">● In Chair</span>
+            </div>
+
+            <div class="chair-card">
+              <div class="chair-info">
+                <div class="chair-badge">02</div>
+                <div class="chair-details">
+                  <strong>Amit · Classic Haircut</strong>
+                  <span>Next customer ready · Token A22</span>
+                </div>
+              </div>
+              <span class="chair-status-tag status-next">● Next Up</span>
+            </div>
+
+            <div class="chair-card">
+              <div class="chair-info">
+                <div class="chair-badge">03</div>
+                <div class="chair-details">
+                  <strong>Deepak · Hair Treatment</strong>
+                  <span>Appointment Slot · 11:30 AM (Token B04)</span>
+                </div>
+              </div>
+              <span class="chair-status-tag status-booked">● Booked Slot</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shop-strip">
+      <div class="strip-content">
+        <div class="strip-item">
+          <strong>100% Mobile & Web</strong>
+          <span>Runs smoothly on any phone, tablet, or PC</span>
+        </div>
+        <div class="strip-item">
+          <strong>Fair FIFO Sequencing</strong>
+          <span>Appointments & walk-ins automatically ordered</span>
+        </div>
+        <div class="strip-item">
+          <strong>Live Minute Countdown</strong>
+          <span>Calculated chair times keep clients updated</span>
+        </div>
+        <div class="strip-item">
+          <strong>6-Digit Barber MPIN</strong>
+          <span>Instant station login with zero password hassle</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="section-wrap">
+      <div class="section-head">
+        <p class="kicker">DESIGNED FOR BARBER SHOPS & SALONS</p>
+        <h2>Everything required to move a busy floor forward.</h2>
+        <p class="desc">Replace confusing waiting lists, paper books, and phone calls with one unified digital system built specifically for barbers.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card highlight">
+          <span class="f-icon">⏱️</span>
+          <h3>Dynamic Minute-by-Minute Chair Timers</h3>
+          <p>When a barber starts a cut, elapsed time is calculated continuously. If a service takes 15 of 25 minutes, the system dynamically adjusts wait times for everyone outside.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="f-icon">📲</span>
+          <h3>Instant Storefront QR Code</h3>
+          <p>Generate high-resolution printable QR codes for your window, front desk, and mirrors. Customers scan and follow their queue from anywhere with no app install.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="f-icon">📅</span>
+          <h3>Unified Walk-in & Appointment Queue</h3>
+          <p>Same-day appointments merge seamlessly into the live line at their scheduled slot. Never double-book or spark arguments about who was first.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="f-icon">📊</span>
+          <h3>Barber Commission & Daily Sales</h3>
+          <p>Track exactly how many customers each barber served, revenue generated, and customer review scores across any custom date range.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="f-icon">⚡</span>
+          <h3>Floor-Ready 6-Digit MPIN</h3>
+          <p>Barbers don't need complex passwords. Each barber logs into their station in 2 seconds with a secure 6-digit MPIN on their trusted mobile phone.</p>
+        </div>
+
+        <div class="feature-card">
+          <span class="f-icon">📍</span>
+          <h3>Free Google Maps Turn-by-Turn</h3>
+          <p>Set your exact shop coordinates with one tap so new customers in your neighbourhood can locate and navigate straight to your entrance.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="section-wrap" style="padding-top: 0;">
+      <div class="section-head">
+        <p class="kicker">3 SIMPLE STEPS</p>
+        <h2>How your shop gets started today.</h2>
+      </div>
+
+      <div class="steps-grid">
+        <div class="step-card">
+          <span class="step-num">01</span>
+          <span class="f-icon">📝</span>
+          <h3>Register your shop & team</h3>
+          <p>Add your shop profile, services, haircut prices, duration, and barber staff members in 2 minutes.</p>
+        </div>
+
+        <div class="step-card">
+          <span class="step-num">02</span>
+          <span class="f-icon">🖨️</span>
+          <h3>Print your storefront QR</h3>
+          <p>Download your unique QR code and place it on your front door, counter, and haircut stations.</p>
+        </div>
+
+        <div class="step-card">
+          <span class="step-num">03</span>
+          <span class="f-icon">💺</span>
+          <h3>Keep every chair moving</h3>
+          <p>Customers scan and wait outside comfortably. Barbers mark cuts as started and completed with one tap.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="testimonials" class="section-wrap" style="padding-top: 0;">
+      <div class="section-head">
+        <p class="kicker">SHOP OWNER EXPERIENCES</p>
+        <h2>Trusted by busy barber shops.</h2>
+      </div>
+
+      <div class="testimonials-grid">
+        <div class="t-card">
+          <div class="t-stars">★★★★★</div>
+          <blockquote>“TrimTime cut our waiting bench chaos to zero. Clients grab a coffee nearby and arrive right when their barber is shaking out the cape from the previous cut.”</blockquote>
+          <div class="t-author">Karan Malhotra · Owner</div>
+          <div class="t-shop">Urban Fade Studio (5 Chairs)</div>
+        </div>
+
+        <div class="t-card">
+          <div class="t-stars">★★★★★</div>
+          <blockquote>“The barber-wise daily reports save me hours of manual bookkeeping every week. And the 6-digit MPIN login is super fast for barbers on the floor.”</blockquote>
+          <div class="t-author">Sameer Khan · Master Barber</div>
+          <div class="t-shop">Blade & Comb Salon (4 Chairs)</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shop-final-cta">
+      <div class="hero-kicker">READY TO UPGRADE YOUR SHOP?</div>
+      <h2>Spend less time managing lines.<br />Make more time for great cuts.</h2>
+      <p>Set up your shop today, generate your QR code, and experience a calmer, more profitable barber shop floor.</p>
+      <div class="final-btns">
+        <a class="cta-btn-primary" href="/staff?auth=signup" style="padding: 16px 28px; font-size: 1.05rem;">Register My Barber Shop (Free) <span>→</span></a>
+        <a class="btn-staff-login" href="/staff?auth=signin" style="padding: 16px 28px; font-size: 1.05rem;">Shop Owner Sign In</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shop-footer">
+    <div>
+      <div class="brand-wrap">
+        <div class="brand-mark">T</div>
+        <span>TrimTime</span>
+        <span class="shop-tag">FOR SHOPS</span>
+      </div>
+      <p class="footer-desc">The smart live queue & appointment system for modern barber shops and salons.</p>
+    </div>
+    <div class="footer-links-col">
+      <a href="/staff?auth=signin">Staff Sign In</a>
+      <a href="/staff?auth=signup">Register Shop</a>
+      <a href="/terms">Terms</a>
+    </div>
+    <div class="customer-portal-banner">
+      Looking for a haircut? <a href="/customer">Go to Customer Portal →</a>
+    </div>
+    <div class="footer-bottom">
+      © <span id="shop-year"></span> TrimTime · All rights reserved.
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector("#shop-year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

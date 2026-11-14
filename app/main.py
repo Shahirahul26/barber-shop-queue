@@ -379,7 +379,7 @@ def staff_page():
 
 @app.get("/shop", include_in_schema=False)
 def shop_page():
-    return FileResponse(STATIC_DIR / "staff.html")
+    return FileResponse(STATIC_DIR / "shop_landing.html")
 
 
 @app.get("/terms", include_in_schema=False)

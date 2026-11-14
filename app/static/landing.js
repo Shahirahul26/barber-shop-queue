@@ -5,11 +5,13 @@ const accessModes = {
 
 document.querySelectorAll("[data-access]").forEach((button) => button.addEventListener("click", () => {
   const mode = button.dataset.access, config = accessModes[mode];
+  if (!config) return;
   document.querySelectorAll("[data-access]").forEach((item) => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-selected", String(active)); });
-  document.querySelector("#access-description").textContent = config.description;
+  const desc = document.querySelector("#access-description");
+  if (desc) desc.textContent = config.description;
   const signIn = document.querySelector("#access-signin"), signUp = document.querySelector("#access-signup");
-  signIn.href = config.signInHref; signIn.innerHTML = `${config.signInLabel} <span>→</span>`;
-  signUp.href = config.signUpHref; signUp.textContent = config.signUpLabel;
+  if (signIn) { signIn.href = config.signInHref; signIn.innerHTML = `${config.signInLabel} <span>→</span>`; }
+  if (signUp) { signUp.href = config.signUpHref; signUp.textContent = config.signUpLabel; }
 }));
 
 function safe(value) { const node = document.createElement("span"); node.textContent = value ?? ""; return node.innerHTML; }

@@ -271,8 +271,9 @@ async function requestOtp(identifier, resetMpin = false) {
   pendingIdentifier = cleanEmail;
   document.querySelector("#otp-request-step").classList.add("hidden");
   document.querySelector("#otp-verify-step").classList.remove("hidden");
-  document.querySelector("#otp-message").textContent = body.message || `Verification code sent to ${cleanEmail}.`;
-  document.querySelector("#development-otp").textContent = body.development_otp ? `Local test OTP: ${body.development_otp}` : "";
+  document.querySelector("#otp-message").textContent = body.message || `Verification code sent to ${cleanEmail}. Check your inbox.`;
+  const statusEl = document.querySelector("#customer-auth-status");
+  if (statusEl) statusEl.textContent = "Verification code has been dispatched to your email.";
 }
 
 function showCustomerMpin(mode, accountName = null) {
