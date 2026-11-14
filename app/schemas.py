@@ -222,6 +222,7 @@ class QueueEntryOut(BaseModel):
     ahead_label: str
     estimated_wait_minutes: int
     availability_message: str | None
+    calculated_at: str | None = None
     source: str
     joined_at: datetime
 
@@ -358,7 +359,10 @@ class ApprovalUpdate(BaseModel):
 
 class AppointmentCreate(BaseModel):
     customer_name: str = Field(min_length=2, max_length=100)
-    phone: str | None = Field(default=None, min_length=10, max_length=20, pattern="^[0-9+ -]+$")
+    phone: str | None = Field(default=None, max_length=20)
+    email: EmailStr | None = None
+    age: int | None = Field(default=None, ge=1, le=120)
+    book_for_other: bool = False
     service_id: int | None = None
     service_ids: list[int] | None = Field(default=None, min_length=1, max_length=20)
     barber_id: int | None = None

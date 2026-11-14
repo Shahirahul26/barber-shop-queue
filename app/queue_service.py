@@ -67,7 +67,10 @@ def queue_metrics(db: Session, shop_id: int) -> tuple[dict[int, dict], int]:
         if entry.started_at:
             started_at = entry.started_at if entry.started_at.tzinfo else entry.started_at.replace(tzinfo=timezone.utc)
             elapsed = max(0, int((now - started_at).total_seconds() // 60))
-            remaining = max(1, remaining - elapsed)
+            if elapsed >= remaining:
+                remaining = max(2, 5 - ((elapsed - remaining) % 5))
+            else:
+                remaining = max(1, remaining - elapsed)
         else:
             remaining = max(5, remaining // 2)
         workloads[assigned] += remaining
@@ -124,4 +127,5 @@ def queue_view(db: Session, entry: QueueEntry) -> dict:
             "barber_name": entry.barber.name if entry.barber else None, "status": entry.status,
             "position": position, "people_ahead": people_ahead, "ahead_label": ahead_label,
             "estimated_wait_minutes": estimated_wait, "availability_message": availability_message,
+            "calculated_at": datetime.now(timezone.utc).isoformat(),
             "source": entry.source, "joined_at": entry.joined_at}

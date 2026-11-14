@@ -214,12 +214,20 @@ def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int
         statement = statement.where(Appointment.shop_id == shop_id)
     promoted_shops: set[int] = set()
     for appointment in db.scalars(statement).all():
-        scheduled_at = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
         shop = db.get(Shop, appointment.shop_id)
-        grace = shop.appointment_grace_minutes if shop else 10
-        queue_entry_time = scheduled_at - timedelta(minutes=grace)
-        if queue_entry_time > now:
+        if not shop:
             continue
+        try:
+            shop_tz = ZoneInfo(shop.timezone)
+        except Exception:
+            shop_tz = ZoneInfo("Asia/Kolkata")
+        today_date = datetime.now(shop_tz).date()
+        scheduled_at = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
+        appointment_date = scheduled_at.astimezone(shop_tz).date()
+
+        # Same-day appointments enter the queue sequence directly for today
+        is_today_or_past = appointment_date <= today_date
+
         existing = db.scalar(select(QueueEntry).where(QueueEntry.appointment_id == appointment.id))
         if existing:
             new_priority = now >= scheduled_at
@@ -230,10 +238,28 @@ def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int
                 appointment.status = "queued"
                 promoted_shops.add(appointment.shop_id)
             continue
-        db.add(QueueEntry(appointment_id=appointment.id, shop_id=appointment.shop_id, customer_id=appointment.customer_id, service_id=appointment.service_id, service_ids=appointment.service_ids, service_names=appointment.service_names, total_duration_minutes=appointment.total_duration_minutes, total_price_rupees=appointment.total_price_rupees, barber_id=appointment.barber_id, barber_profile_id=appointment.barber_profile_id, customer_name=appointment.customer_name, phone=appointment.phone, source="appointment", priority_active=now >= scheduled_at, joined_at=scheduled_at))
-        appointment.status = "queued"
-        audit(db, "appointment.promoted_to_queue", shop_id=appointment.shop_id, details=f"appointment_id={appointment.id}")
-        promoted_shops.add(appointment.shop_id)
+
+        if is_today_or_past:
+            db.add(QueueEntry(
+                appointment_id=appointment.id,
+                shop_id=appointment.shop_id,
+                customer_id=appointment.customer_id,
+                service_id=appointment.service_id,
+                service_ids=appointment.service_ids,
+                service_names=appointment.service_names,
+                total_duration_minutes=appointment.total_duration_minutes,
+                total_price_rupees=appointment.total_price_rupees,
+                barber_id=appointment.barber_id,
+                barber_profile_id=appointment.barber_profile_id,
+                customer_name=appointment.customer_name,
+                phone=appointment.phone,
+                source="appointment",
+                priority_active=now >= scheduled_at,
+                joined_at=scheduled_at
+            ))
+            appointment.status = "queued"
+            audit(db, "appointment.promoted_to_queue", shop_id=appointment.shop_id, details=f"appointment_id={appointment.id}")
+            promoted_shops.add(appointment.shop_id)
     if promoted_shops:
         db.commit()
     return promoted_shops
@@ -348,6 +374,11 @@ def customer_page():
 
 @app.get("/staff", include_in_schema=False)
 def staff_page():
+    return FileResponse(STATIC_DIR / "staff.html")
+
+
+@app.get("/shop", include_in_schema=False)
+def shop_page():
     return FileResponse(STATIC_DIR / "staff.html")
 
 
@@ -645,7 +676,7 @@ def check_customer_device(payload: DeviceCheckRequest, db: Session = Depends(get
     kind, identifier = customer_identifier(payload.identifier)
     customer = db.scalar(select(CustomerUser).where(getattr(CustomerUser, kind) == identifier))
     enabled = bool(customer and customer.is_verified and customer.mpin_hash and trusted_device(db, device_id=payload.device_id, customer_id=customer.id))
-    return {"mpin_login": enabled}
+    return {"mpin_login": enabled, "name": customer.name if (enabled and customer) else None, "email": customer.email if (enabled and customer) else None}
 
 
 @app.post("/api/customer-auth/login-mpin")
@@ -1108,13 +1139,18 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
     # Serialize joins for this shop so two simultaneous requests cannot receive
     # the same shop-local daily token number.
     shop = db.scalar(select(Shop).where(Shop.id == shop_id).with_for_update())
-    service = db.get(Service, payload.service_id) if payload.service_id else None
+    service_ids = list(dict.fromkeys(payload.service_ids or ([payload.service_id] if payload.service_id else [])))
+    services = list(db.scalars(select(Service).where(Service.id.in_(service_ids), Service.shop_id == shop_id, Service.is_active.is_(True))).all()) if service_ids else []
+    service = services[0] if services else None
     if shop is None or (service is not None and (service.shop_id != shop_id or not service.is_active)):
         raise HTTPException(status_code=404, detail="Shop or service not found")
     if payload.source == "walk_in" and service is None:
         raise HTTPException(status_code=400, detail="Choose a service for the walk-in customer")
     if shop.queue_paused:
         raise HTTPException(status_code=409, detail="This shop has temporarily paused new queue entries")
+    total_duration = sum(s.duration_minutes for s in services) if services else (service.duration_minutes if service else None)
+    total_price = sum(s.price_rupees for s in services) if services else (service.price_rupees if service else None)
+    service_names = ", ".join(s.name for s in services) if services else None
     barber = db.get(Barber, payload.barber_id) if payload.barber_id else None
     if barber and (barber.shop_id != shop_id or not barber.is_active):
         raise HTTPException(status_code=400, detail="Selected barber is unavailable")
@@ -1157,7 +1193,7 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
         ) or 0
         if daily_join_count >= 3:
             raise HTTPException(status_code=409, detail="You already have three non-completed live-queue joins today. Complete an active service or try again tomorrow before joining another queue with the same customer account, phone number, or email address.")
-    entry = QueueEntry(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id if service else None, service_ids=[service.id] if service else [], service_names=service.name if service else None, total_duration_minutes=service.duration_minutes if service else None, total_price_rupees=service.price_rupees if service else None, barber_id=barber.id if barber else None, barber_profile_id=barber.barber_profile_id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, email=str(payload.email).lower() if payload.email else None, source=payload.source, queue_day=queue_day, daily_token_number=next_token_number)
+    entry = QueueEntry(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id if service else None, service_ids=service_ids, service_names=service_names, total_duration_minutes=total_duration, total_price_rupees=total_price, barber_id=barber.id if barber else None, barber_profile_id=barber.barber_profile_id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, email=str(payload.email).lower() if payload.email else None, source=payload.source, queue_day=queue_day, daily_token_number=next_token_number)
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -1664,8 +1700,70 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
             raise HTTPException(status_code=409, detail="All barbers are busy during this service slot. Choose another time.")
         barber = available[0]
     customer = optional_customer(request, db)
-    item = Appointment(shop_id=shop_id, customer_id=customer.id if customer else None, service_id=service.id, service_ids=service_ids, service_names=service_names, total_duration_minutes=total_duration, total_price_rupees=total_price, barber_id=barber.id if barber else None, barber_profile_id=barber.barber_profile_id if barber else None, customer_name=payload.customer_name.strip(), phone=payload.phone, scheduled_at=payload.scheduled_at.astimezone(timezone.utc), booking_day=booking_day, daily_booking_number=next_booking_number)
+    existing_conds = [
+        Appointment.shop_id == shop_id,
+        Appointment.status.in_(("booked", "confirmed", "queued"))
+    ]
+    ident_checks = []
+    if customer:
+        ident_checks.append(Appointment.customer_id == customer.id)
+    if payload.phone:
+        ident_checks.append(Appointment.phone == payload.phone)
+    if ident_checks:
+        existing_active = db.scalar(select(Appointment).where(*existing_conds, or_(*ident_checks)))
+        if existing_active:
+            time_str = existing_active.scheduled_at.astimezone(shop_timezone).strftime("%I:%M %p, %d %b")
+            token_str = f"B{(existing_active.daily_booking_number or existing_active.id):02d}"
+            raise HTTPException(
+                status_code=409,
+                detail=f"You already have an active appointment scheduled for {time_str} (Token: {token_str}). Please change your time slot or view your existing ticket."
+            )
+
+    booked_name = payload.customer_name.strip()
+    if payload.book_for_other and payload.age:
+        booked_name = f"{booked_name} (Age: {payload.age})"
+
+    item = Appointment(
+        shop_id=shop_id,
+        customer_id=customer.id if customer else None,
+        service_id=service.id,
+        service_ids=service_ids,
+        service_names=service_names,
+        total_duration_minutes=total_duration,
+        total_price_rupees=total_price,
+        barber_id=barber.id if barber else None,
+        barber_profile_id=barber.barber_profile_id if barber else None,
+        customer_name=booked_name,
+        phone=payload.phone,
+        scheduled_at=payload.scheduled_at.astimezone(timezone.utc),
+        booking_day=booking_day,
+        daily_booking_number=next_booking_number
+    )
     db.add(item)
+    db.flush()
+
+    local_now = datetime.now(shop_timezone)
+    if booking_day == local_now.date():
+        queue_entry = QueueEntry(
+            appointment_id=item.id,
+            shop_id=shop_id,
+            customer_id=item.customer_id,
+            service_id=item.service_id,
+            service_ids=item.service_ids,
+            service_names=item.service_names,
+            total_duration_minutes=item.total_duration_minutes,
+            total_price_rupees=item.total_price_rupees,
+            barber_id=item.barber_id,
+            barber_profile_id=item.barber_profile_id,
+            customer_name=item.customer_name,
+            phone=item.phone,
+            source="appointment",
+            priority_active=datetime.now(timezone.utc) >= item.scheduled_at,
+            joined_at=item.scheduled_at
+        )
+        db.add(queue_entry)
+        item.status = "queued"
+
     db.commit()
     db.refresh(item)
     item.service, item.barber = service, barber

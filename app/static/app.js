@@ -224,154 +224,154 @@ document.querySelector("#history-rating-form").addEventListener("submit", async 
   } catch (reason) { result.textContent = reason.message; }
 });
 async function restoreCustomerSession() {
-  if (!customerToken) return;
-  const response = await fetch("/api/customer-auth/me", { headers: { Authorization: `Bearer ${customerToken}` } });
-  if (!response.ok) { sessionStorage.removeItem("trimtimeCustomerToken"); customerToken = null; return; }
-  showCustomerApp(await response.json());
-}
-let firebaseConfirmationResult = null, firebaseIdToken = null, isFirebaseMode = false;
+  if (customerToken) {
+    try {
+      const response = await fetch("/api/customer-auth/me", { headers: { Authorization: `Bearer ${customerToken}` } });
+      if (response.ok) {
+        showCustomerApp(await response.json());
+        return;
+      }
+    } catch {}
+    sessionStorage.removeItem("trimtimeCustomerToken");
+    customerToken = null;
+  }
 
-function isPhoneIdentifier(val) {
-  return !val.includes("@") && Boolean(val.replace(/\D/g, "").length >= 10);
-}
-
-function formatE164Phone(val) {
-  const digits = val.replace(/\D/g, "");
-  if (val.trim().startsWith("+")) return "+" + digits;
-  if (digits.length === 10) return "+91" + digits;
-  if (digits.length === 12 && digits.startsWith("91")) return "+" + digits;
-  return "+" + digits;
+  // Device-level fast MPIN login if customer previously logged in on this device
+  const savedEmail = localStorage.getItem("trimtimeCustomerEmail");
+  if (savedEmail && customerDeviceId && customerAuthMode !== "signup") {
+    try {
+      const check = await fetch("/api/customer-auth/check-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: savedEmail, device_id: customerDeviceId })
+      }).then((r) => r.json());
+      if (check.mpin_login) {
+        pendingIdentifier = savedEmail;
+        showCustomerMpin("login", check.name || null);
+      }
+    } catch (err) {
+      console.warn("Device check failed:", err);
+    }
+  }
 }
 
 async function requestOtp(identifier, resetMpin = false) {
   resetCustomerMpin = resetMpin;
-  const isPhone = isPhoneIdentifier(identifier);
-  const hasFirebase = Boolean(window.firebase && window.firebase.apps && window.firebase.apps.length > 0 && window.firebaseConfig && window.firebaseConfig.apiKey);
-
-  if (isPhone && hasFirebase) {
-    try {
-      const e164 = formatE164Phone(identifier);
-      const rcContainer = document.querySelector("#recaptcha-container");
-      if (rcContainer) rcContainer.innerHTML = "";
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); } catch {}
-        window.recaptchaVerifier = null;
-      }
-      window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier("recaptcha-container", {
-        size: "invisible",
-        callback: () => {}
-      });
-      await window.recaptchaVerifier.render();
-      const confirmationResult = await firebase.auth().signInWithPhoneNumber(e164, window.recaptchaVerifier);
-      firebaseConfirmationResult = confirmationResult;
-      isFirebaseMode = true;
-      pendingIdentifier = identifier;
-      document.querySelector("#otp-request-step").classList.add("hidden");
-      document.querySelector("#otp-verify-step").classList.remove("hidden");
-      document.querySelector("#otp-message").textContent = `SMS verification code sent to ${e164}.`;
-      document.querySelector("#development-otp").textContent = "";
-      return;
-    } catch (firebaseErr) {
-      console.error("Firebase phone auth error:", firebaseErr);
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.clear(); } catch {}
-        window.recaptchaVerifier = null;
-      }
-      const rcContainer = document.querySelector("#recaptcha-container");
-      if (rcContainer) rcContainer.innerHTML = "";
-      isFirebaseMode = false;
-      const code = firebaseErr.code || "";
-      let msg = firebaseErr.message || "Failed to send SMS OTP via Firebase.";
-      if (code === "auth/captcha-check-failed" || code === "auth/invalid-app-credential") {
-        const currentHost = location.hostname;
-        if (currentHost === "127.0.0.1") {
-          msg = "reCAPTCHA failed on 127.0.0.1. Please open the website as 'http://localhost:8000' (or add '127.0.0.1' to Firebase Console -> Authentication -> Settings -> Authorized domains).";
-        } else {
-          msg = `reCAPTCHA blocked by Google: domain '${currentHost}' is not authorized. Please add '${currentHost}' in Firebase Console -> Authentication -> Settings -> Authorized domains, then refresh the page.`;
-        }
-      } else if (code === "auth/unauthorized-domain") {
-        msg = `Domain '${location.hostname}' is not authorized. In Firebase Console -> Authentication -> Settings -> Authorized domains -> click 'Add domain' and enter '${location.hostname}'.`;
-      } else if (code === "auth/operation-not-allowed") {
-        if (firebaseErr.message && (firebaseErr.message.includes("region") || firebaseErr.message.includes("SMS unable to be sent"))) {
-          msg = "SMS Region is blocked by Google! Go to Firebase Console -> Authentication -> Settings -> SMS Regions policy -> Enable India (+91).";
-        } else {
-          msg = "Phone provider or SMS Region is disabled in Firebase. Enable Phone and SMS Region Policy in Firebase Console.";
-        }
-      } else if (code === "auth/invalid-phone-number") {
-        msg = "Invalid phone number format. Please enter a valid 10-digit mobile number.";
-      } else if (code === "auth/quota-exceeded") {
-        msg = "Firebase SMS quota exceeded. Check your Firebase Console usage.";
-      } else if (code === "auth/too-many-requests") {
-        msg = "Too many requests sent. Please wait a few minutes before trying again.";
-      } else if (code === "auth/app-not-authorized") {
-        msg = "This domain/app is not authorized in Firebase. Check Authorized Domains in Firebase Console.";
-      }
-      throw new Error(msg);
-    }
-  }
-
-  isFirebaseMode = false;
-  firebaseConfirmationResult = null;
-  const response = await fetch("/api/customer-auth/request-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier, device_id: customerDeviceId }) });
-  const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail));
+  const cleanEmail = identifier.trim().toLowerCase();
+  const response = await fetch("/api/customer-auth/request-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier: cleanEmail, device_id: customerDeviceId })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(formatApiError(body.detail));
   firstTimeCustomer = body.first_time;
-  if (customerAuthMode === "signin" && firstTimeCustomer) throw new Error("No customer account was found. Please return to the home page and choose New customer? Sign up.");
-  if (customerAuthMode === "signup" && !firstTimeCustomer) throw new Error("This customer account already exists. Please return to the home page and choose Customer sign in.");
-  pendingIdentifier = identifier; document.querySelector("#otp-request-step").classList.add("hidden"); document.querySelector("#otp-verify-step").classList.remove("hidden"); document.querySelector("#otp-message").textContent = body.message;
+  if (customerAuthMode === "signin" && firstTimeCustomer) throw new Error("No customer account found for this email. Please return and choose New customer? Sign up.");
+  if (customerAuthMode === "signup" && !firstTimeCustomer) throw new Error("This customer account already exists. Please choose Customer sign in.");
+  pendingIdentifier = cleanEmail;
+  document.querySelector("#otp-request-step").classList.add("hidden");
+  document.querySelector("#otp-verify-step").classList.remove("hidden");
+  document.querySelector("#otp-message").textContent = body.message || `Verification code sent to ${cleanEmail}.`;
   document.querySelector("#development-otp").textContent = body.development_otp ? `Local test OTP: ${body.development_otp}` : "";
 }
-function showCustomerMpin(mode) {
+
+function showCustomerMpin(mode, accountName = null) {
   customerMpinMode = mode;
   ["#otp-request-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id).classList.add("hidden"));
   document.querySelector("#customer-mpin-step").classList.remove("hidden");
   const enteringExisting = mode === "login" || mode === "verify", needsConfirm = mode === "setup";
-  document.querySelector("#customer-mpin-title").textContent = enteringExisting ? "Enter your MPIN" : (resetCustomerMpin ? "Create a new MPIN" : "Create your 6-digit MPIN");
-  document.querySelector("#customer-mpin-copy").textContent = enteringExisting ? "Enter your MPIN to trust this device and continue." : "Use this MPIN for future sign-ins on this device.";
+  const titleEl = document.querySelector("#customer-mpin-title");
+  if (titleEl) {
+    titleEl.textContent = enteringExisting
+      ? (accountName ? `Welcome back, ${accountName}!` : "Enter your MPIN")
+      : (resetCustomerMpin ? "Create a new MPIN" : "Create your 6-digit MPIN");
+  }
+  const copyEl = document.querySelector("#customer-mpin-copy");
+  if (copyEl) {
+    copyEl.textContent = enteringExisting
+      ? "Enter your 6-digit MPIN to sign in on this trusted device."
+      : "Use this MPIN for instant sign-ins on this device in the future.";
+  }
+  const banner = document.querySelector("#customer-saved-device-banner");
+  const badge = document.querySelector("#customer-saved-email-badge");
+  if (banner && badge) {
+    if (mode === "login" && pendingIdentifier) {
+      badge.textContent = pendingIdentifier;
+      banner.classList.remove("hidden");
+    } else {
+      banner.classList.add("hidden");
+    }
+  }
   document.querySelector("#customer-confirm-mpin-label").classList.toggle("hidden", !needsConfirm);
   document.querySelector("#customer-confirm-mpin").required = needsConfirm;
-  document.querySelector("#customer-mpin-submit").textContent = enteringExisting ? "Sign in" : "Save MPIN and continue";
+  document.querySelector("#customer-mpin-submit").textContent = enteringExisting ? "Sign in →" : "Save MPIN and continue →";
   document.querySelector("#forgot-customer-mpin").classList.toggle("hidden", !enteringExisting);
 }
-document.querySelector("#otp-request-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; pendingIdentifier = document.querySelector("#customer-identifier").value.trim(); try { const check = await fetch("/api/customer-auth/check-device", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: pendingIdentifier, device_id: customerDeviceId }) }).then((response) => response.json()); if (check.mpin_login && customerAuthMode !== "signup") showCustomerMpin("login"); else await requestOtp(pendingIdentifier); } catch (reason) { authError.textContent = reason.message; } });
-document.querySelector("#resend-customer-otp").addEventListener("click", async () => { const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; try { await requestOtp(pendingIdentifier); } catch (reason) { authError.textContent = reason.message; } });
-async function completeOtpVerification(profile = {}) {
-  if (isFirebaseMode) {
-    const payload = {
-      phone: pendingIdentifier,
-      id_token: firebaseIdToken,
-      reset_mpin: resetCustomerMpin,
-      ...profile
-    };
-    const response = await fetch("/api/customer-auth/verify-firebase-phone", {
+
+const switchAccountBtn = document.querySelector("#switch-account-btn");
+if (switchAccountBtn) {
+  switchAccountBtn.addEventListener("click", () => {
+    localStorage.removeItem("trimtimeCustomerEmail");
+    pendingIdentifier = "";
+    document.querySelector("#customer-mpin-step").classList.add("hidden");
+    document.querySelector("#otp-request-step").classList.remove("hidden");
+    const identInput = document.querySelector("#customer-identifier");
+    if (identInput) {
+      identInput.value = "";
+      identInput.focus();
+    }
+  });
+}
+
+document.querySelector("#otp-request-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const authError = document.querySelector("#customer-auth-error");
+  authError.textContent = "";
+  pendingIdentifier = document.querySelector("#customer-identifier").value.trim().toLowerCase();
+  try {
+    const check = await fetch("/api/customer-auth/check-device", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(formatApiError(body.detail));
-    if (body.requires_profile) {
-      document.querySelector("#otp-verify-step").classList.add("hidden");
-      document.querySelector("#customer-profile-step").classList.remove("hidden");
-      return;
+      body: JSON.stringify({ identifier: pendingIdentifier, device_id: customerDeviceId })
+    }).then((r) => r.json());
+    if (check.mpin_login && customerAuthMode !== "signup") {
+      showCustomerMpin("login", check.name || null);
+    } else {
+      await requestOtp(pendingIdentifier);
     }
-    customerMpinVerification = body.verification_token;
-    showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify");
-    return;
+  } catch (reason) {
+    authError.textContent = reason.message;
   }
-  const response = await fetch("/api/customer-auth/verify-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: pendingIdentifier, otp: pendingOtp, reset_mpin: resetCustomerMpin, ...profile }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail)); customerMpinVerification = body.verification_token; showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify");
+});
+
+document.querySelector("#resend-customer-otp").addEventListener("click", async () => {
+  const authError = document.querySelector("#customer-auth-error");
+  authError.textContent = "";
+  try {
+    await requestOtp(pendingIdentifier);
+  } catch (reason) {
+    authError.textContent = reason.message;
+  }
+});
+
+async function completeOtpVerification(profile = {}) {
+  const response = await fetch("/api/customer-auth/verify-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier: pendingIdentifier, otp: pendingOtp, reset_mpin: resetCustomerMpin, ...profile })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(formatApiError(body.detail));
+  customerMpinVerification = body.verification_token;
+  showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify", body.customer ? body.customer.name : null);
 }
+
 document.querySelector("#otp-verify-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
   authError.textContent = "";
   pendingOtp = document.querySelector("#customer-otp").value.trim();
   try {
-    if (isFirebaseMode && firebaseConfirmationResult) {
-      const cred = await firebaseConfirmationResult.confirm(pendingOtp);
-      firebaseIdToken = await cred.user.getIdToken();
-      await completeOtpVerification();
-      return;
-    }
     if (firstTimeCustomer) {
       document.querySelector("#otp-verify-step").classList.add("hidden");
       document.querySelector("#customer-profile-step").classList.remove("hidden");
@@ -382,9 +382,59 @@ document.querySelector("#otp-verify-form").addEventListener("submit", async (eve
     authError.textContent = reason.message || "Invalid OTP code";
   }
 });
-document.querySelector("#customer-profile-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; try { await completeOtpVerification({ name: document.querySelector("#verified-customer-name").value.trim(), age: Number(document.querySelector("#verified-customer-age").value), gender: document.querySelector("#verified-customer-gender").value, terms_accepted: document.querySelector("#customer-terms").checked }); } catch (reason) { authError.textContent = reason.message; } });
-document.querySelector("#customer-mpin-form").addEventListener("submit", async (event) => { event.preventDefault(); const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; const mpin = document.querySelector("#customer-mpin").value; try { const path = customerMpinMode === "login" ? "/api/customer-auth/login-mpin" : "/api/customer-auth/complete-mpin"; const payload = customerMpinMode === "login" ? { identifier: pendingIdentifier, mpin, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) } : { verification_token: customerMpinVerification, mpin, confirm_mpin: document.querySelector("#customer-confirm-mpin").value || null, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) }; const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail)); customerToken = body.access_token; sessionStorage.setItem("trimtimeCustomerToken", customerToken); showCustomerApp(body.customer); } catch (reason) { authError.textContent = reason.message; } });
-document.querySelector("#forgot-customer-mpin").addEventListener("click", async () => { const authError = document.querySelector("#customer-auth-error"); authError.textContent = ""; try { document.querySelector("#customer-mpin-step").classList.add("hidden"); await requestOtp(pendingIdentifier, true); } catch (reason) { authError.textContent = reason.message; } });
+
+document.querySelector("#customer-profile-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const authError = document.querySelector("#customer-auth-error");
+  authError.textContent = "";
+  try {
+    await completeOtpVerification({
+      name: document.querySelector("#verified-customer-name").value.trim(),
+      age: Number(document.querySelector("#verified-customer-age").value),
+      gender: document.querySelector("#verified-customer-gender").value,
+      terms_accepted: document.querySelector("#customer-terms").checked
+    });
+  } catch (reason) {
+    authError.textContent = reason.message;
+  }
+});
+
+document.querySelector("#customer-mpin-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const authError = document.querySelector("#customer-auth-error");
+  authError.textContent = "";
+  const mpin = document.querySelector("#customer-mpin").value;
+  try {
+    const path = customerMpinMode === "login" ? "/api/customer-auth/login-mpin" : "/api/customer-auth/complete-mpin";
+    const payload = customerMpinMode === "login"
+      ? { identifier: pendingIdentifier, mpin, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) }
+      : { verification_token: customerMpinVerification, mpin, confirm_mpin: document.querySelector("#customer-confirm-mpin").value || null, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) };
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(formatApiError(body.detail));
+    customerToken = body.access_token;
+    sessionStorage.setItem("trimtimeCustomerToken", customerToken);
+    localStorage.setItem("trimtimeCustomerEmail", pendingIdentifier);
+    showCustomerApp(body.customer);
+  } catch (reason) {
+    authError.textContent = reason.message;
+  }
+});
+
+document.querySelector("#forgot-customer-mpin").addEventListener("click", async () => {
+  const authError = document.querySelector("#customer-auth-error");
+  authError.textContent = "";
+  try {
+    document.querySelector("#customer-mpin-step").classList.add("hidden");
+    await requestOtp(pendingIdentifier, true);
+  } catch (reason) {
+    authError.textContent = reason.message;
+  }
+});
 fetch("/api/platform/banner").then((response) => response.json()).then((banner) => { document.querySelectorAll(".brand-name").forEach((item) => item.textContent = banner.software_name); if (banner.login_image_url) { document.querySelector("#customer-auth-image").style.backgroundImage = `linear-gradient(135deg,#173c35cc,#245c5277),url("${banner.login_image_url}")`; document.querySelector("#customer-profile-ad").style.backgroundImage = `url("${banner.login_image_url}")`; } }).catch(() => {});
 
 function fillSelect(selector, items, label) {
@@ -875,6 +925,11 @@ function renderSlotCards(slots, selectedBarberName = null) {
         if (label) label.textContent = isThis ? "Selected" : "Select this slot";
       });
 
+      // Hide available slot cards and filters when a slot is chosen
+      cardsContainer.classList.add("hidden");
+      if (filterTabs) filterTabs.classList.add("hidden");
+      if (countBadge) countBadge.classList.add("hidden");
+
       if (summaryBox) {
         document.querySelector("#summary-slot-time").textContent = `${slotObj.label} · ${formatAppDate(document.querySelector("#appointment-date").value)}`;
         const bNames = (slotObj.barber_names || []).join(", ");
@@ -982,6 +1037,12 @@ if (clearSlotBtn) {
     if (slotInput) slotInput.value = "";
     const summaryBox = document.querySelector("#appointment-selected-slot-summary");
     if (summaryBox) summaryBox.classList.add("hidden");
+    const cardsContainer = document.querySelector("#appointment-slot-cards");
+    const filterTabs = document.querySelector("#slot-period-filters");
+    const countBadge = document.querySelector("#slot-count-badge");
+    if (cardsContainer) cardsContainer.classList.remove("hidden");
+    if (filterTabs) filterTabs.classList.remove("hidden");
+    if (countBadge) countBadge.classList.remove("hidden");
     document.querySelectorAll(".slot-card").forEach((card) => {
       card.classList.remove("selected");
       card.setAttribute("aria-checked", "false");
@@ -1014,6 +1075,37 @@ document.querySelector("#nearby-shops").addEventListener("click", () => {
   }, () => document.querySelector("#form-error").textContent = "Location permission is needed to find nearby shops.");
 });
 
+let liveWaitTimer = null;
+let lastTicketEntry = null;
+let ticketSnapshotTime = null;
+
+function updateLiveWaitDisplay() {
+  if (!lastTicketEntry || lastTicketEntry.status !== "waiting") return;
+  const baseWait = Number(lastTicketEntry.estimated_wait_minutes) || 0;
+  if (baseWait <= 0) {
+    const waitEl = document.querySelector("#ticket-wait");
+    if (waitEl) waitEl.textContent = "0";
+    return;
+  }
+  const elapsedMs = ticketSnapshotTime ? Date.now() - ticketSnapshotTime : 0;
+  const elapsedMinutes = Math.floor(elapsedMs / 60000);
+  const liveWait = Math.max(1, baseWait - elapsedMinutes);
+  const waitEl = document.querySelector("#ticket-wait");
+  if (waitEl) waitEl.textContent = String(liveWait);
+  const heroWaitEl = document.querySelector("#wait-time");
+  if (heroWaitEl && !heroWaitEl.closest(".hero.hidden")) {
+    heroWaitEl.textContent = String(liveWait);
+  }
+}
+
+function startLiveWaitCountdown(entry) {
+  lastTicketEntry = entry;
+  ticketSnapshotTime = Date.now();
+  updateLiveWaitDisplay();
+  if (liveWaitTimer) clearInterval(liveWaitTimer);
+  liveWaitTimer = setInterval(updateLiveWaitDisplay, 10000);
+}
+
 async function sendAlert(entry) {
   if (entry.availability_message || !("Notification" in window) || Notification.permission !== "granted" || entry.people_ahead === lastPeopleAhead) return;
   if (entry.people_ahead === 2) new Notification("TrimTime", { body: entry.ahead_label === "turns ahead" ? "Only two turns remain before you." : "Only two customers are ahead of you." });
@@ -1030,6 +1122,11 @@ function showTicket(entry) {
     localStorage.removeItem("trimtimeQueueToken");
     activeToken = null;
     hideOtherShopTicketBanner();
+  }
+
+  if (completed || cancelled) {
+    if (liveWaitTimer) clearInterval(liveWaitTimer);
+    liveWaitTimer = null;
   }
 
   if (!shopId) {
@@ -1061,6 +1158,10 @@ function showTicket(entry) {
   document.querySelector("#notify").classList.toggle("hidden", completed || cancelled);
   document.querySelector("#leave-queue").classList.toggle("hidden", completed || cancelled);
   document.querySelector("#rating-form").classList.toggle("hidden", !completed);
+
+  if (!completed && !cancelled && entry.status === "waiting") {
+    startLiveWaitCountdown(entry);
+  }
 }
 
 async function refreshTicket() {
@@ -1129,30 +1230,153 @@ document.querySelector("#notify").addEventListener("click", async () => {
 });
 
 document.querySelector("#join-form").addEventListener("submit", async (event) => {
-  event.preventDefault(); const error = document.querySelector("#form-error"); error.textContent = "";
+  event.preventDefault();
+  const error = document.querySelector("#form-error");
+  error.textContent = "";
+  const serviceVal = document.querySelector("#service").value;
+  if (!serviceVal) {
+    error.textContent = "Selecting a service is mandatory to join the live queue and calculate wait time.";
+    return;
+  }
   try {
     const barber = document.querySelector("#barber").value;
-    const entry = await api(`/api/shops/${shopId}/queue`, { method: "POST", body: JSON.stringify({ customer_name: document.querySelector("#customer-name").value, phone: document.querySelector("#phone").value || null, service_id: Number(document.querySelector("#service").value), barber_id: barber ? Number(barber) : null, source: "online" }) });
-    activeToken = entry.public_token; localStorage.setItem("trimtimeQueueToken", activeToken); showTicket(entry); await loadShop();
-  } catch (message) { error.textContent = message.message; showCustomerNotice(message.message); }
+    const entry = await api(`/api/shops/${shopId}/queue`, {
+      method: "POST",
+      body: JSON.stringify({
+        customer_name: document.querySelector("#customer-name").value.trim(),
+        phone: document.querySelector("#phone").value.trim() || null,
+        service_id: Number(serviceVal),
+        barber_id: barber ? Number(barber) : null,
+        source: "online"
+      })
+    });
+    activeToken = entry.public_token;
+    localStorage.setItem("trimtimeQueueToken", activeToken);
+    showTicket(entry);
+    await loadShop();
+  } catch (message) {
+    error.textContent = message.message;
+    showCustomerNotice(message.message);
+  }
 });
 
+let appointmentTarget = "self";
+const targetSelfBtn = document.querySelector("#target-self-btn");
+const targetOtherBtn = document.querySelector("#target-other-btn");
+const otherFields = document.querySelector("#appointment-other-fields");
+if (targetSelfBtn && targetOtherBtn) {
+  targetSelfBtn.addEventListener("click", () => {
+    appointmentTarget = "self";
+    targetSelfBtn.classList.add("active");
+    targetOtherBtn.classList.remove("active");
+    if (otherFields) otherFields.classList.add("hidden");
+  });
+  targetOtherBtn.addEventListener("click", () => {
+    appointmentTarget = "other";
+    targetOtherBtn.classList.add("active");
+    targetSelfBtn.classList.remove("active");
+    if (otherFields) otherFields.classList.remove("hidden");
+  });
+}
+
 document.querySelector("#book-appointment").addEventListener("click", async () => {
-  const result = document.querySelector("#appointment-result"); result.textContent = "";
+  const result = document.querySelector("#appointment-result");
+  result.innerHTML = "";
   try {
     const time = document.querySelector("#appointment-slot").value;
-    if (!time) throw new Error("Choose an available appointment slot.");
+    if (!time) throw new Error("Please select an available appointment time slot.");
     const barber = document.querySelector("#appointment-barber").value;
     const serviceIds = selectedAppointmentServiceIds();
-    if (!serviceIds.length) throw new Error("Choose at least one service.");
-    const appointment = await api(`/api/shops/${shopId}/appointments`, { method: "POST", body: JSON.stringify({ customer_name: document.querySelector("#customer-name").value, phone: document.querySelector("#phone").value.trim() || null, service_ids: serviceIds, barber_id: barber ? Number(barber) : null, scheduled_at: time }) });
-    activeAppointmentToken = appointment.public_token; localStorage.setItem("trimtimeAppointmentToken", activeAppointmentToken); showAppointment(appointment);
+    if (!serviceIds.length) throw new Error("Please select at least one service.");
+
+    let custName = "";
+    let custPhone = null;
+    let custAge = null;
+    const isOther = appointmentTarget === "other";
+
+    if (isOther) {
+      const otherNameEl = document.querySelector("#appointment-other-name");
+      const otherAgeEl = document.querySelector("#appointment-other-age");
+      const otherPhoneEl = document.querySelector("#appointment-other-phone");
+      if (!otherNameEl || otherNameEl.value.trim().length < 2) {
+        throw new Error("Please enter the full name of the person for this booking.");
+      }
+      if (!otherAgeEl || !otherAgeEl.value || Number(otherAgeEl.value) < 1) {
+        throw new Error("Please enter a valid age for the person.");
+      }
+      custName = otherNameEl.value.trim();
+      custAge = Number(otherAgeEl.value);
+      custPhone = otherPhoneEl && otherPhoneEl.value.trim() ? otherPhoneEl.value.trim() : (document.querySelector("#phone").value.trim() || null);
+    } else {
+      custName = document.querySelector("#customer-name").value.trim() || "Customer";
+      custPhone = document.querySelector("#phone").value.trim() || null;
+    }
+
+    const payload = {
+      customer_name: custName,
+      phone: custPhone,
+      age: custAge,
+      book_for_other: isOther,
+      service_ids: serviceIds,
+      barber_id: barber ? Number(barber) : null,
+      scheduled_at: time
+    };
+
+    const appointment = await api(`/api/shops/${shopId}/appointments`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    activeAppointmentToken = appointment.public_token;
+    localStorage.setItem("trimtimeAppointmentToken", activeAppointmentToken);
+    showAppointment(appointment);
     document.querySelector("#appointment-panel").classList.add("hidden");
-    result.textContent = `Appointment booked for ${appointment.service_name}. Your booking token is ${appointment.token}. Scheduled for ${formatAppDateTime(appointment.scheduled_at)}. It will enter the live queue as PRIORITY ${appointment.total_duration_minutes} minutes before the slot.`;
+
+    result.innerHTML = `
+      <div class="appointment-success-box">
+        <strong>✓ Appointment confirmed!</strong>
+        <p>Booking token: <b>${appointment.token}</b> for ${formatAppDateTime(appointment.scheduled_at)}.</p>
+      </div>
+    `;
     await loadAppointmentSlots();
   } catch (reason) {
-    result.textContent = reason.message;
-    if ("Notification" in window && Notification.permission === "granted") new Notification("Appointment unavailable", { body: reason.message });
+    console.error("Appointment booking error:", reason);
+    const msg = reason.message || "Failed to book appointment.";
+    if (msg.toLowerCase().includes("already have an active appointment")) {
+      result.innerHTML = `
+        <div class="appointment-conflict-card">
+          <span class="conflict-icon">⚠️</span>
+          <div class="conflict-body">
+            <strong>Active appointment already exists</strong>
+            <p>${escapeHtml(msg)}</p>
+            <div class="conflict-buttons">
+              <button type="button" id="conflict-change-slot-btn" class="secondary small">Pick another time slot</button>
+              <button type="button" id="conflict-view-ticket-btn" class="primary small">View existing booking</button>
+            </div>
+          </div>
+        </div>
+      `;
+      const changeBtn = document.querySelector("#conflict-change-slot-btn");
+      if (changeBtn) {
+        changeBtn.addEventListener("click", () => {
+          const clearBtn = document.querySelector("#clear-selected-slot");
+          if (clearBtn) clearBtn.click();
+          result.innerHTML = "";
+        });
+      }
+      const viewBtn = document.querySelector("#conflict-view-ticket-btn");
+      if (viewBtn) {
+        viewBtn.addEventListener("click", async () => {
+          await restoreActiveAppointment();
+          result.innerHTML = "";
+        });
+      }
+    } else {
+      result.innerHTML = `<p class="error">${escapeHtml(msg)}</p>`;
+    }
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Appointment notice", { body: msg });
+    }
   }
 });
 

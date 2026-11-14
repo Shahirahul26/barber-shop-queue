@@ -991,3 +991,164 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
     grid-template-columns: 1fr;
   }
 }
+
+/* Saved Device & MPIN Fast Login */
+.saved-device-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #f1f8f5;
+  border: 1px solid #b7d6c8;
+  border-radius: 12px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  font-size: 0.88rem;
+  color: #173c35;
+}
+.saved-device-banner #customer-saved-email-badge {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.switch-account-btn {
+  background: transparent !important;
+  color: #1b5e50 !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  text-decoration: underline !important;
+  cursor: pointer !important;
+  min-height: 0 !important;
+  width: auto !important;
+  box-shadow: none !important;
+}
+.switch-account-btn:hover {
+  color: #0f3d33 !important;
+}
+
+/* Mandatory Star Indicator */
+.mandatory-star {
+  color: #e11d48;
+  font-weight: 800;
+  font-size: 0.82rem;
+  margin-left: 4px;
+}
+
+/* Appointment Target Switch (Myself vs Other) */
+.appointment-target-switch {
+  display: flex;
+  gap: 8px;
+  background: #edf3f0;
+  border-radius: 12px;
+  padding: 4px;
+  margin: 12px 0 16px;
+  border: 1px solid #c7ded3;
+}
+.appointment-target-switch .target-btn {
+  flex: 1;
+  padding: 10px 14px !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: #3b5a4d !important;
+  border: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  min-height: 0 !important;
+  width: auto !important;
+}
+.appointment-target-switch .target-btn.active {
+  background: white !important;
+  color: #173c35 !important;
+  box-shadow: 0 2px 8px rgba(16, 44, 39, 0.1) !important;
+}
+
+/* Appointment Other Fields Form Row */
+.appointment-other-fields {
+  background: #f7faf8;
+  border: 1px solid #d2e4db;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 500px) {
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Appointment Conflict & Success UI */
+.appointment-conflict-card {
+  display: flex;
+  gap: 12px;
+  background: #fff8eb;
+  border: 1.5px solid #f6cf7d;
+  border-radius: 14px;
+  padding: 14px 16px;
+  color: #78350f;
+  margin-top: 14px;
+}
+.appointment-conflict-card .conflict-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.appointment-conflict-card .conflict-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.appointment-conflict-card strong {
+  font-size: 0.98rem;
+  color: #92400e;
+}
+.appointment-conflict-card p {
+  font-size: 0.88rem;
+  margin: 0;
+  line-height: 1.4;
+  color: #78350f;
+}
+.conflict-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.conflict-buttons button {
+  padding: 8px 14px !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  min-height: 0 !important;
+  width: auto !important;
+  margin: 0 !important;
+}
+.appointment-success-box {
+  background: #ecfdf5;
+  border: 1.5px solid #a7f3d0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #065f46;
+  margin-top: 14px;
+}
+.appointment-success-box strong {
+  display: block;
+  font-size: 1.02rem;
+  margin-bottom: 4px;
+}
+.appointment-success-box p {
+  margin: 0;
+  font-size: 0.9rem;
+}
