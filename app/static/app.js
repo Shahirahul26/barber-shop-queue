@@ -17,6 +17,7 @@ let customerToken = sessionStorage.getItem("trimtimeCustomerToken");
 const customerDeviceId = localStorage.getItem("trimtimeCustomerDeviceId") || crypto.randomUUID();
 localStorage.setItem("trimtimeCustomerDeviceId", customerDeviceId);
 let activeToken = localStorage.getItem("trimtimeQueueToken");
+let currentQueueEntry = null;
 let activeAppointmentToken = localStorage.getItem("trimtimeAppointmentToken");
 let lastPeopleAhead = null;
 let historyRatingTarget = null;
@@ -128,7 +129,7 @@ function showCustomerApp(customer) {
     sessionStorage.removeItem("trimtimeScannedShopId");
     sessionStorage.removeItem("trimtimeActiveShopId");
   }
-  loadShops().then(() => Promise.all([restoreActiveQueue(), refreshAppointment()])).catch((reason) => showCustomerNotice(reason.message));
+  loadShops().then(() => Promise.all([restoreActiveQueue(), restoreActiveAppointment()])).catch((reason) => showCustomerNotice(reason.message));
 }
 function showCustomerNotice(message, success = false) {
   const notice = document.querySelector("#customer-notice"); clearTimeout(customerNoticeTimer);
@@ -826,18 +827,20 @@ function renderJoinServiceCards(services) {
   });
 }
 
-document.querySelector("#show-join-options").addEventListener("click", () => {
-  if (currentQueueEntry && (currentQueueEntry.status === "waiting" || currentQueueEntry.status === "serving") && currentQueueEntry.shop_id === shopId) {
-    showCustomerNotice(`You already have an active ticket in the live queue.`);
-    showTicket(currentQueueEntry);
-    ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-    return;
-  }
+function openJoinQueuePanel() {
   const apptPanel = document.querySelector("#appointment-panel");
   if (apptPanel) apptPanel.classList.add("hidden");
   joinPanel.classList.remove("hidden");
   populateJoinForm();
   joinPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function joinCurrentShop() {
+  openJoinQueuePanel();
+}
+
+document.querySelector("#show-join-options").addEventListener("click", () => {
+  openJoinQueuePanel();
 });
 
 const closeJoinBtn = document.querySelector("#close-join-panel");
@@ -1215,12 +1218,16 @@ function showTicket(entry) {
   if (cancelled) {
     localStorage.removeItem("trimtimeQueueToken");
     activeToken = null;
+    currentQueueEntry = null;
     hideOtherShopTicketBanner();
   }
 
   if (completed || cancelled) {
     if (liveWaitTimer) clearInterval(liveWaitTimer);
     liveWaitTimer = null;
+    currentQueueEntry = null;
+  } else {
+    currentQueueEntry = entry;
   }
 
   if (!shopId) {
@@ -1491,7 +1498,40 @@ function showAppointment(appointment) {
   }
   panel.classList.remove("hidden");
   document.querySelector("#appointment-ticket-token").textContent = appointment.token;
-  document.querySelector("#appointment-ticket-status").textContent = appointment.status.replace("_", " ");
+
+  const now = Date.now();
+  const scheduledTime = new Date(appointment.scheduled_at).getTime();
+  const diffMinutes = Math.round((scheduledTime - now) / 60000);
+
+  let statusText = appointment.status.replace("_", " ");
+  let messageText = "Keep this booking token for your visit.";
+
+  if (appointment.status === "confirmed" || appointment.status === "booked") {
+    if (diffMinutes > 0) {
+      const hours = Math.floor(diffMinutes / 60);
+      const mins = diffMinutes % 60;
+      const timeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
+      statusText = `Confirmed · Starts at ${formatAppDateTime(appointment.scheduled_at)}`;
+      messageText = `Your appointment is confirmed. Service begins at ${formatAppDateTime(appointment.scheduled_at)} (in ${timeRemaining}). Please arrive 5 minutes early.`;
+    } else {
+      statusText = "Slot active";
+      messageText = "Your scheduled appointment slot is starting now! Please notify the barber or take your chair.";
+    }
+  } else if (appointment.status === "queued") {
+    statusText = "In Queue (Priority)";
+    messageText = "Your scheduled appointment slot has arrived! You are now in the live queue as PRIORITY.";
+  } else if (appointment.status === "serving") {
+    statusText = "In Chair";
+    messageText = "Your service is currently in progress.";
+  } else if (appointment.status === "cancelled") {
+    statusText = "Cancelled";
+    messageText = "This appointment was cancelled.";
+  } else if (appointment.status === "completed") {
+    statusText = "Completed";
+    messageText = "This appointment has been completed.";
+  }
+
+  document.querySelector("#appointment-ticket-status").textContent = statusText;
   document.querySelector("#appointment-ticket-details").textContent = `${appointment.service_name} · ${formatAppDateTime(appointment.scheduled_at)} · ${appointment.barber_name || "Any available barber"}`;
   const terminal = ["cancelled", "completed", "no_show"].includes(appointment.status);
   document.querySelector("#cancel-appointment").classList.toggle("hidden", terminal || appointment.status === "serving");
@@ -1499,33 +1539,35 @@ function showAppointment(appointment) {
   const ratingSubmitted = localStorage.getItem("trimtimeRatedAppointmentToken") === appointment.public_token;
   document.querySelector("#appointment-rating-form").classList.toggle("hidden", appointment.status !== "completed" || ratingSubmitted);
   document.querySelector("#appointment-rebook").classList.toggle("hidden", appointment.status !== "completed");
-  document.querySelector("#appointment-ticket-message").textContent = appointment.status === "cancelled" ? "This appointment was cancelled." : appointment.status === "completed" ? "This appointment has been completed." : appointment.status === "queued" ? "Your appointment is now in the live queue as PRIORITY." : "Keep this booking token for your visit.";
+  document.querySelector("#appointment-ticket-message").textContent = messageText;
 }
 
-document.querySelector("#rate-appointment").addEventListener("click", () => {
-  if (activeAppointmentToken) openHistoryRating("appointment", activeAppointmentToken, document.querySelector("#appointment-ticket-details").textContent);
-});
-document.querySelector("#appointment-rating-form").addEventListener("submit", async (event) => {
-  event.preventDefault(); const result = document.querySelector("#appointment-rating-result"); result.textContent = "";
-  const shopStars = Number(document.querySelector("#appointment-shop-rating").value), barberStars = Number(document.querySelector("#appointment-barber-rating").value);
-  if (!shopStars || !barberStars) { result.textContent = "Select both shop and barber ratings from 1 to 5 stars."; return; }
-  try {
-    await api("/api/ratings", { method: "POST", body: JSON.stringify({ appointment_public_token: activeAppointmentToken, stars: shopStars, barber_stars: barberStars, comment: document.querySelector("#appointment-feedback").value.trim() || null, barber_comment: null }) });
-    localStorage.setItem("trimtimeRatedAppointmentToken", activeAppointmentToken); event.target.reset(); event.target.classList.add("hidden"); await loadShops();
-  } catch (reason) {
-    result.textContent = reason.message;
-    if (reason.message.toLowerCase().includes("already rated")) {
-      localStorage.setItem("trimtimeRatedAppointmentToken", activeAppointmentToken);
-      event.target.classList.add("hidden");
+async function restoreActiveAppointment() {
+  let appt = null;
+  if (customerToken) {
+    try {
+      appt = await api("/api/customer-auth/active-appointment");
+    } catch {
+      appt = null;
     }
   }
-});
-document.querySelector("#appointment-rebook").addEventListener("click", async () => { if (activeAppointmentDetails) await openShopBooking(activeAppointmentDetails.shop_id, activeAppointmentDetails.service_ids, activeAppointmentDetails.barber_id); });
+  if (!appt && activeAppointmentToken) {
+    try {
+      appt = await api(`/api/my-appointment/${activeAppointmentToken}`);
+    } catch {
+      localStorage.removeItem("trimtimeAppointmentToken");
+      activeAppointmentToken = null;
+    }
+  }
+  if (appt) {
+    activeAppointmentToken = appt.public_token;
+    localStorage.setItem("trimtimeAppointmentToken", activeAppointmentToken);
+    showAppointment(appt);
+  }
+}
 
 async function refreshAppointment() {
-  if (!activeAppointmentToken) return;
-  try { showAppointment(await api(`/api/my-appointment/${activeAppointmentToken}`)); }
-  catch { localStorage.removeItem("trimtimeAppointmentToken"); activeAppointmentToken = null; }
+  await restoreActiveAppointment();
 }
 
 document.querySelector("#cancel-appointment").addEventListener("click", async () => {

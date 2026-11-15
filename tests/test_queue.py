@@ -9,7 +9,8 @@ os.environ["SECRET_KEY"] = "test-secret-key-that-is-long-enough"
 from fastapi.testclient import TestClient
 from app.database import SessionLocal
 from app.main import app
-from app.models import Appointment, QueueEntry, QueueStatus
+from app.models import Appointment, CustomerUser, QueueEntry, QueueStatus
+from app.security import create_customer_token
 
 
 def test_phase_two_customer_and_staff_flow():
@@ -498,6 +499,63 @@ def test_admin_toggle_appointments_feature():
         assert res2.status_code == 200
         assert res2.json()["appointments_enabled"] is True
         assert client.get("/api/shops/1").json()["appointments_enabled"] is True
+
+
+def test_customer_can_book_for_other_without_duplicate_conflict():
+    with TestClient(app) as client:
+        # Create a customer session
+        with SessionLocal() as db:
+            from sqlalchemy import select
+            customer = db.scalar(select(CustomerUser).where(CustomerUser.email == "booker@example.com"))
+            if not customer:
+                customer = CustomerUser(email="booker@example.com", phone="9988776655", name="Primary Booker", is_verified=True)
+                db.add(customer)
+                db.commit()
+                db.refresh(customer)
+            cust_token = create_customer_token(customer.id)
+
+        auth_headers = {"Authorization": f"Bearer {cust_token}"}
+        shop = client.get("/api/shops/1").json()
+        service_id = shop["services"][0]["id"]
+        barber_id = shop["barbers"][0]["id"]
+        tomorrow = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(days=2)).replace(hour=11, minute=0, second=0, microsecond=0)
+
+        # 1. Book for self
+        res_self = client.post("/api/shops/1/appointments", headers=auth_headers, json={
+            "customer_name": "Primary Booker",
+            "phone": "9988776655",
+            "service_id": service_id,
+            "barber_id": barber_id,
+            "scheduled_at": tomorrow.isoformat(),
+            "book_for_other": False
+        })
+        assert res_self.status_code == 201
+
+        # 2. Duplicate self booking should be rejected with 409
+        slot2 = tomorrow.replace(hour=11, minute=30)
+        res_self_dup = client.post("/api/shops/1/appointments", headers=auth_headers, json={
+            "customer_name": "Primary Booker",
+            "phone": "9988776655",
+            "service_id": service_id,
+            "barber_id": barber_id,
+            "scheduled_at": slot2.isoformat(),
+            "book_for_other": False
+        })
+        assert res_self_dup.status_code == 409
+        assert "already have an active appointment" in res_self_dup.json()["detail"].lower()
+
+        # 3. Booking for someone else should SUCCEED even with existing self appointment
+        res_other = client.post("/api/shops/1/appointments", headers=auth_headers, json={
+            "customer_name": "Rohan Kumar",
+            "phone": "9988776699",
+            "age": 16,
+            "service_id": service_id,
+            "barber_id": barber_id,
+            "scheduled_at": slot2.isoformat(),
+            "book_for_other": True
+        })
+        assert res_other.status_code == 201
+        assert res_other.json()["customer_name"] == "Rohan Kumar (Age: 16)"
 
 
 

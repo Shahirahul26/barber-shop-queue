@@ -217,16 +217,11 @@ def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int
         shop = db.get(Shop, appointment.shop_id)
         if not shop:
             continue
-        try:
-            shop_tz = ZoneInfo(shop.timezone)
-        except Exception:
-            shop_tz = ZoneInfo("Asia/Kolkata")
-        today_date = datetime.now(shop_tz).date()
         scheduled_at = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
-        appointment_date = scheduled_at.astimezone(shop_tz).date()
-
-        # Same-day appointments enter the queue sequence directly for today
-        is_today_or_past = appointment_date <= today_date
+        grace = shop.appointment_grace_minutes if shop else 10
+        queue_entry_time = scheduled_at - timedelta(minutes=grace)
+        if queue_entry_time > now:
+            continue
 
         existing = db.scalar(select(QueueEntry).where(QueueEntry.appointment_id == appointment.id))
         if existing:
@@ -239,27 +234,26 @@ def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int
                 promoted_shops.add(appointment.shop_id)
             continue
 
-        if is_today_or_past:
-            db.add(QueueEntry(
-                appointment_id=appointment.id,
-                shop_id=appointment.shop_id,
-                customer_id=appointment.customer_id,
-                service_id=appointment.service_id,
-                service_ids=appointment.service_ids,
-                service_names=appointment.service_names,
-                total_duration_minutes=appointment.total_duration_minutes,
-                total_price_rupees=appointment.total_price_rupees,
-                barber_id=appointment.barber_id,
-                barber_profile_id=appointment.barber_profile_id,
-                customer_name=appointment.customer_name,
-                phone=appointment.phone,
-                source="appointment",
-                priority_active=now >= scheduled_at,
-                joined_at=scheduled_at
-            ))
-            appointment.status = "queued"
-            audit(db, "appointment.promoted_to_queue", shop_id=appointment.shop_id, details=f"appointment_id={appointment.id}")
-            promoted_shops.add(appointment.shop_id)
+        db.add(QueueEntry(
+            appointment_id=appointment.id,
+            shop_id=appointment.shop_id,
+            customer_id=appointment.customer_id,
+            service_id=appointment.service_id,
+            service_ids=appointment.service_ids,
+            service_names=appointment.service_names,
+            total_duration_minutes=appointment.total_duration_minutes,
+            total_price_rupees=appointment.total_price_rupees,
+            barber_id=appointment.barber_id,
+            barber_profile_id=appointment.barber_profile_id,
+            customer_name=appointment.customer_name,
+            phone=appointment.phone,
+            source="appointment",
+            priority_active=now >= scheduled_at,
+            joined_at=scheduled_at
+        ))
+        appointment.status = "queued"
+        audit(db, "appointment.promoted_to_queue", shop_id=appointment.shop_id, details=f"appointment_id={appointment.id}")
+        promoted_shops.add(appointment.shop_id)
     if promoted_shops:
         db.commit()
     return promoted_shops
@@ -772,6 +766,23 @@ def customer_active_queue(request: Request, db: Session = Depends(get_db)):
     return queue_view(db, entry) if entry else None
 
 
+@app.get("/api/customer-auth/active-appointment", response_model=AppointmentOut | None)
+def customer_active_appointment(request: Request, db: Session = Depends(get_db)):
+    customer = optional_customer(request, db)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Customer login required")
+    appointment = db.scalar(
+        select(Appointment)
+        .options(joinedload(Appointment.service), joinedload(Appointment.barber))
+        .where(
+            Appointment.customer_id == customer.id,
+            Appointment.status.in_(("booked", "confirmed", "queued", "serving")),
+        )
+        .order_by(Appointment.scheduled_at.desc(), Appointment.id.desc())
+    )
+    return appointment_view(appointment) if appointment else None
+
+
 @app.get("/api/customer-auth/history")
 def customer_history(request: Request, db: Session = Depends(get_db)):
     customer = optional_customer(request, db)
@@ -1170,6 +1181,7 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
         db.execute(select(CustomerUser.id).where(CustomerUser.id == customer.id).with_for_update()).scalar_one()
         active_in_shop = db.scalar(select(QueueEntry).where(
             QueueEntry.shop_id == shop_id,
+            QueueEntry.source == "online",
             QueueEntry.status.in_([QueueStatus.WAITING, QueueStatus.SERVING]),
             QueueEntry.customer_id == customer.id
         ))
@@ -1699,24 +1711,41 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
         Appointment.shop_id == shop_id,
         Appointment.status.in_(("booked", "confirmed", "queued"))
     ]
-    ident_checks = []
-    if customer:
-        ident_checks.append(Appointment.customer_id == customer.id)
-    if payload.phone:
-        ident_checks.append(Appointment.phone == payload.phone)
-    if ident_checks:
-        existing_active = db.scalar(select(Appointment).where(*existing_conds, or_(*ident_checks)))
-        if existing_active:
-            time_str = existing_active.scheduled_at.astimezone(shop_timezone).strftime("%I:%M %p, %d %b")
-            token_str = f"B{(existing_active.daily_booking_number or existing_active.id):02d}"
-            raise HTTPException(
-                status_code=409,
-                detail=f"You already have an active appointment scheduled for {time_str} (Token: {token_str}). Please change your time slot or view your existing ticket."
-            )
-
     booked_name = payload.customer_name.strip()
     if payload.book_for_other and payload.age:
         booked_name = f"{booked_name} (Age: {payload.age})"
+
+    if not payload.book_for_other:
+        ident_checks = []
+        if customer:
+            ident_checks.append(Appointment.customer_id == customer.id)
+        if payload.phone:
+            ident_checks.append(Appointment.phone == payload.phone)
+        if ident_checks:
+            existing_active = db.scalar(select(Appointment).where(*existing_conds, or_(*ident_checks)))
+            if existing_active:
+                time_str = existing_active.scheduled_at.astimezone(shop_timezone).strftime("%I:%M %p, %d %b")
+                token_str = f"B{(existing_active.daily_booking_number or existing_active.id):02d}"
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"You already have an active appointment scheduled for {time_str} (Token: {token_str}). Please change your time slot or view your existing ticket."
+                )
+    else:
+        other_name_checks = [
+            Appointment.shop_id == shop_id,
+            Appointment.status.in_(("booked", "confirmed", "queued")),
+            Appointment.customer_name == booked_name
+        ]
+        if payload.phone:
+            other_name_checks.append(Appointment.phone == payload.phone)
+        existing_other = db.scalar(select(Appointment).where(*other_name_checks))
+        if existing_other:
+            time_str = existing_other.scheduled_at.astimezone(shop_timezone).strftime("%I:%M %p, %d %b")
+            token_str = f"B{(existing_other.daily_booking_number or existing_other.id):02d}"
+            raise HTTPException(
+                status_code=409,
+                detail=f"An appointment for {booked_name} is already scheduled for {time_str} (Token: {token_str})."
+            )
 
     item = Appointment(
         shop_id=shop_id,
@@ -1737,8 +1766,10 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
     db.add(item)
     db.flush()
 
-    local_now = datetime.now(shop_timezone)
-    if booking_day == local_now.date():
+    now_utc = datetime.now(timezone.utc)
+    grace = shop.appointment_grace_minutes if shop else 10
+    queue_entry_time = item.scheduled_at - timedelta(minutes=grace)
+    if now_utc >= queue_entry_time:
         queue_entry = QueueEntry(
             appointment_id=item.id,
             shop_id=shop_id,
@@ -1753,11 +1784,13 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
             customer_name=item.customer_name,
             phone=item.phone,
             source="appointment",
-            priority_active=datetime.now(timezone.utc) >= item.scheduled_at,
+            priority_active=now_utc >= item.scheduled_at,
             joined_at=item.scheduled_at
         )
         db.add(queue_entry)
         item.status = "queued"
+    else:
+        item.status = "confirmed"
 
     db.commit()
     db.refresh(item)
