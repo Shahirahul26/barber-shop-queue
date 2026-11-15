@@ -1337,23 +1337,51 @@ document.querySelector("#notify").addEventListener("click", async () => {
   document.querySelector("#notify").textContent = "Live alerts enabled";
 });
 
-document.querySelector("#join-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function handleJoinQueueSubmit(event) {
+  if (event) event.preventDefault();
   const error = document.querySelector("#form-error");
-  error.textContent = "";
-  const selectedCards = [...document.querySelectorAll("#join-services-grid .service-card-choice.selected")];
-  if (!selectedCards.length) {
-    error.textContent = "Selecting at least one service is mandatory to join the live queue.";
+  if (error) error.textContent = "";
+
+  const customerName = document.querySelector("#customer-name")?.value.trim();
+  if (!customerName) {
+    if (error) error.textContent = "Please enter your name.";
     return;
   }
-  const serviceIds = selectedCards.map((c) => Number(c.dataset.serviceId));
+
+  let selectedCards = [...document.querySelectorAll("#join-services-grid .service-card-choice.selected")];
+  if (!selectedCards.length) {
+    const selectVal = document.querySelector("#service")?.value;
+    if (selectVal) {
+      selectedCards = [{ dataset: { serviceId: selectVal } }];
+    }
+  }
+  if (!selectedCards.length) {
+    if (error) error.textContent = "Selecting at least one service is mandatory to join the live queue.";
+    return;
+  }
+
+  const activeTargetShopId = shopId || currentShop?.id || Number(document.querySelector("#shop")?.value) || Number(sessionStorage.getItem("trimtimeActiveShopId")) || Number(localStorage.getItem("trimtimeLastShopId")) || (allShops[0] ? allShops[0].id : null);
+  if (!activeTargetShopId) {
+    if (error) error.textContent = "Please select a barber shop first.";
+    return;
+  }
+
+  const serviceIds = selectedCards.map((c) => Number(c.dataset.serviceId)).filter(Boolean);
+  const submitBtn = document.querySelector("#join-queue-submit-btn");
+
   try {
-    const barber = document.querySelector("#barber").value;
-    const entry = await api(`/api/shops/${shopId}/queue`, {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Joining live queue…";
+    }
+    const barber = document.querySelector("#barber")?.value;
+    const phoneVal = document.querySelector("#phone")?.value.trim();
+    const entry = await api(`/api/shops/${activeTargetShopId}/queue`, {
       method: "POST",
       body: JSON.stringify({
-        customer_name: document.querySelector("#customer-name").value.trim(),
-        phone: document.querySelector("#phone").value.trim() || null,
+        customer_name: customerName,
+        phone: phoneVal || null,
+        email: currentCustomer?.email || null,
         service_id: serviceIds[0],
         service_ids: serviceIds,
         barber_id: barber ? Number(barber) : null,
@@ -1367,7 +1395,7 @@ document.querySelector("#join-form").addEventListener("submit", async (event) =>
     await loadShop();
     ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (message) {
-    error.textContent = message.message;
+    if (error) error.textContent = message.message;
     showCustomerNotice(message.message);
     if (message.message && (message.message.includes("active ticket") || message.message.includes("already have an active"))) {
       joinPanel.classList.add("hidden");
@@ -1375,8 +1403,19 @@ document.querySelector("#join-form").addEventListener("submit", async (event) =>
       if (activeToken) await refreshTicket();
       ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = "Confirm & Join Live Queue <span>→</span>";
+    }
   }
+}
+
+document.querySelector("#close-join-panel")?.addEventListener("click", () => {
+  joinPanel.classList.add("hidden");
 });
+
+document.querySelector("#join-form")?.addEventListener("submit", handleJoinQueueSubmit);
 
 let appointmentTarget = "self";
 const targetSelfBtn = document.querySelector("#target-self-btn");
@@ -1527,8 +1566,16 @@ function showAppointment(appointment) {
       messageText = "Your scheduled appointment slot is starting now! Please notify the barber or take your chair.";
     }
   } else if (appointment.status === "queued") {
-    statusText = "In Queue (Priority)";
-    messageText = "Your scheduled appointment slot has arrived! You are now in the live queue as PRIORITY.";
+    if (diffMinutes > 0) {
+      const hours = Math.floor(diffMinutes / 60);
+      const mins = diffMinutes % 60;
+      const timeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
+      statusText = `Scheduled for ${formatAppDateTime(appointment.scheduled_at)}`;
+      messageText = `Your appointment is sequenced in the live queue for ${formatAppDateTime(appointment.scheduled_at)} (in ${timeRemaining}). Please arrive 5 minutes early.`;
+    } else {
+      statusText = "In Queue (Priority)";
+      messageText = "Your scheduled appointment slot has arrived! You are now in the live queue as PRIORITY.";
+    }
   } else if (appointment.status === "serving") {
     statusText = "In Chair";
     messageText = "Your service is currently in progress.";

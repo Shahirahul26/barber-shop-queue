@@ -454,6 +454,7 @@ document.querySelector("#registration-form").addEventListener("submit", async (e
 });
 
 function resetDashboardTabs() {
+  closeWalkinModal();
   document.querySelectorAll(".tab-section").forEach((section) => {
     section.classList.toggle("hidden", section.id !== "tab-queue");
   });
@@ -521,8 +522,19 @@ async function loadBarberInvitations() { const panel = document.querySelector("#
 function renderAppointments(items) {
   const list = document.querySelector("#appointment-list");
   if (!items.length) { list.innerHTML = '<div class="panel empty">No appointments booked.</div>'; return; }
-  list.innerHTML = items.map((item) => { const terminal = ["completed", "cancelled", "no_show"].includes(item.status); const actions = terminal ? "" : item.status === "queued" ? `<button data-appointment="${item.id}" data-appointment-status="cancelled" class="ghost">Cancel appointment</button>` : `<button data-appointment="${item.id}" data-appointment-status="completed">Complete</button><button data-appointment="${item.id}" data-appointment-status="cancelled" class="ghost">Cancel appointment</button>`; return `<article class="queue-item appointment-item"><div class="token">${escapeHtml(item.token)}</div><div class="customer"><strong>${escapeHtml(item.customer_name)}</strong><span>${escapeHtml(item.service_name)} · ${formatAppDateTime(item.scheduled_at)}</span></div><div class="position">${item.status === "queued" ? "PRIORITY · Live queue" : item.status}</div><div class="actions">${actions}</div></article>`; }).join("");
-  list.querySelectorAll("[data-appointment]").forEach((button) => button.addEventListener("click", async () => { try { await request(`/api/appointments/${button.dataset.appointment}`, { method: "PATCH", body: JSON.stringify({ status: button.dataset.appointmentStatus }) }); message(button.dataset.appointmentStatus === "cancelled" ? "Appointment cancelled" : "Appointment completed"); await refreshAll(); } catch (reason) { error.textContent = reason.message; } }));
+  list.innerHTML = items.map((item) => {
+    const terminal = ["completed", "cancelled", "no_show"].includes(item.status);
+    const actions = terminal ? "" : `<button data-appointment="${item.id}" data-appointment-status="cancelled" class="ghost">Cancel appointment</button>`;
+    const posLabel = item.status === "queued" ? "PRIORITY · Live queue" : item.status;
+    return `<article class="queue-item appointment-item"><div class="token">${escapeHtml(item.token)}</div><div class="customer"><strong>${escapeHtml(item.customer_name)}</strong><span>${escapeHtml(item.service_name)} · ${formatAppDateTime(item.scheduled_at)}</span></div><div class="position">${posLabel}</div><div class="actions">${actions}</div></article>`;
+  }).join("");
+  list.querySelectorAll("[data-appointment]").forEach((button) => button.addEventListener("click", async () => {
+    try {
+      await request(`/api/appointments/${button.dataset.appointment}`, { method: "PATCH", body: JSON.stringify({ status: button.dataset.appointmentStatus }) });
+      message(button.dataset.appointmentStatus === "cancelled" ? "Appointment cancelled" : "Appointment updated");
+      await refreshAll();
+    } catch (reason) { error.textContent = reason.message; }
+  }));
 }
 
 function renderRangeAnalytics(data) {
@@ -533,25 +545,28 @@ function renderRangeAnalytics(data) {
 }
 
 function updateStaffServicesSummary() {
-  const checked = [...document.querySelectorAll('#staff-queue-services-list input[name="staff_service"]:checked')];
+  const checked = [...document.querySelectorAll('#staff-service-options input[name="staff_service"]:checked, #staff-queue-services-list input[name="staff_service"]:checked')];
   const summaryBar = document.querySelector("#staff-services-summary-bar");
+  const toggleSpan = document.querySelector("#staff-service-toggle span");
   if (!summaryBar) return;
   if (checked.length === 0) {
     summaryBar.classList.add("hidden");
+    if (toggleSpan) toggleSpan.textContent = "Choose services";
     return;
   }
-  summaryBar.classList.remove("hidden");
   const names = checked.map((input) => input.dataset.name).join(", ");
-  const totalDuration = checked.reduce((acc, input) => acc + Number(input.dataset.duration), 0);
-  const totalPrice = checked.reduce((acc, input) => acc + Number(input.dataset.price), 0);
+  const totalDuration = checked.reduce((acc, input) => acc + Number(input.dataset.duration || 0), 0);
+  const totalPrice = checked.reduce((acc, input) => acc + Number(input.dataset.price || 0), 0);
+  if (toggleSpan) toggleSpan.textContent = `${names} · ${totalDuration} min · ₹${totalPrice}`;
   document.querySelector("#staff-summary-names").textContent = names;
   document.querySelector("#staff-summary-duration").textContent = `${totalDuration} min`;
   document.querySelector("#staff-summary-price").textContent = `₹${totalPrice}`;
+  summaryBar.classList.remove("hidden");
 }
 
 function fillStaffBarberSelect() {
   document.querySelector("#staff-barber").innerHTML = `<option value="">Not applicable</option>${shop.barbers.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("")}`;
-  const servicesList = document.querySelector("#staff-queue-services-list");
+  const servicesList = document.querySelector("#staff-service-options") || document.querySelector("#staff-queue-services-list");
   if (servicesList) {
     servicesList.innerHTML = (shop.services && shop.services.length)
       ? shop.services.map((item) => `
@@ -571,8 +586,62 @@ function fillStaffBarberSelect() {
   }
   const queueBarbers = staffRole === "barber" ? shop.barbers.filter((item) => item.id === staffBarberId) : shop.barbers;
   const queueBarberSelect = document.querySelector("#staff-queue-barber");
-  queueBarberSelect.innerHTML = `${staffRole === "barber" ? "" : '<option value="">Any available barber</option>'}${queueBarbers.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("")}`;
-  queueBarberSelect.disabled = staffRole === "barber";
+  if (queueBarberSelect) {
+    queueBarberSelect.innerHTML = `${staffRole === "barber" ? "" : '<option value="">Any available barber</option>'}${queueBarbers.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("")}`;
+    queueBarberSelect.disabled = staffRole === "barber";
+  }
+}
+
+function openWalkinModal() {
+  const modal = document.querySelector("#walkin-modal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  fillStaffBarberSelect();
+  setTimeout(() => document.querySelector("#staff-queue-name")?.focus(), 50);
+}
+
+function closeWalkinModal() {
+  const modal = document.querySelector("#walkin-modal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  const form = document.querySelector("#staff-queue-form");
+  if (form) form.reset();
+  const toggle = document.querySelector("#staff-service-toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", "false");
+    const span = toggle.querySelector("span");
+    if (span) span.textContent = "Choose services";
+  }
+  const opts = document.querySelector("#staff-service-options");
+  if (opts) opts.classList.add("hidden");
+  const summaryBar = document.querySelector("#staff-services-summary-bar");
+  if (summaryBar) summaryBar.classList.add("hidden");
+  const result = document.querySelector("#staff-queue-result");
+  if (result) result.textContent = "";
+}
+
+document.querySelector("#close-walkin-modal")?.addEventListener("click", closeWalkinModal);
+document.querySelector("#cancel-walkin-modal")?.addEventListener("click", closeWalkinModal);
+document.querySelector("#toolbar-open-walkin-btn")?.addEventListener("click", openWalkinModal);
+document.querySelector("#walkin-modal")?.addEventListener("click", (e) => {
+  if (e.target === document.querySelector("#walkin-modal")) closeWalkinModal();
+});
+
+const staffServiceToggle = document.querySelector("#staff-service-toggle");
+const staffServiceOptions = document.querySelector("#staff-service-options");
+if (staffServiceToggle && staffServiceOptions) {
+  staffServiceToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isHidden = staffServiceOptions.classList.contains("hidden");
+    staffServiceOptions.classList.toggle("hidden", !isHidden);
+    staffServiceToggle.setAttribute("aria-expanded", String(isHidden));
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#staff-service-picker")) {
+      staffServiceOptions.classList.add("hidden");
+      staffServiceToggle.setAttribute("aria-expanded", "false");
+    }
+  });
 }
 
 function fillShopForm() {
@@ -677,6 +746,10 @@ async function deleteBarber(id) {
 
 document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
   const target = button.dataset.tab;
+  if (target === "walkin") {
+    openWalkinModal();
+    return;
+  }
   const fromDashboardNav = Boolean(button.closest(".dashboard-nav"));
   const managementTargets = ["services", "team", "analytics", "settings", "shop"];
   const canManage = ["owner", "manager"].includes(staffRole);
@@ -733,10 +806,10 @@ document.querySelector("#staff-queue-form").addEventListener("submit", async (ev
   result.className = "form-result"; result.textContent = "";
   const barberId = document.querySelector("#staff-queue-barber").value;
   try {
-    const checkedServices = [...document.querySelectorAll('#staff-queue-services-list input[name="staff_service"]:checked')];
-    if (!checkedServices.length) throw new Error("Please select at least one service before adding the customer.");
+    const checkedServices = [...document.querySelectorAll('#staff-service-options input[name="staff_service"]:checked, #staff-queue-services-list input[name="staff_service"]:checked')];
+    if (!checkedServices.length) throw new Error("Please select at least one service before generating a token.");
     const serviceIds = checkedServices.map((input) => Number(input.value));
-    submit.disabled = true; submit.textContent = "Adding customer...";
+    submit.disabled = true; submit.textContent = "Generating token...";
     const created = await request(`/api/shops/${shopId}/queue`, {
       method: "POST",
       body: JSON.stringify({
@@ -749,14 +822,13 @@ document.querySelector("#staff-queue-form").addEventListener("submit", async (ev
         source: "walk_in"
       })
     });
-    event.target.reset(); fillStaffBarberSelect();
+    closeWalkinModal();
     const queueEntries = await request(`/api/shops/${shopId}/queue`);
     renderQueue(queueEntries); document.querySelector("#queue-nav-count").textContent = queueEntries.filter((entry) => ["waiting", "serving"].includes(entry.status)).length;
-    result.classList.add("success"); result.textContent = `${created.customer_name} added successfully with token ${created.token}.`;
-    message("Customer added to the live queue");
-    setTimeout(() => document.querySelector('.dashboard-nav [data-tab="queue"]').click(), 900);
+    message(`Token ${created.token} generated for ${created.customer_name}`);
+    await refreshAll();
   } catch (reason) { result.classList.add("error"); result.textContent = reason.message; error.textContent = reason.message; }
-  finally { submit.disabled = Boolean(shop?.queue_paused); submit.textContent = shop?.queue_paused ? "New joins are paused" : "Add to live queue"; }
+  finally { submit.disabled = Boolean(shop?.queue_paused); submit.innerHTML = 'Generate token & add to live queue <span>→</span>'; }
 });
 document.querySelector("#shop-form").addEventListener("submit", async (event) => {
   event.preventDefault();

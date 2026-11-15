@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="stylesheet" href="/static/styles.css?v=60" />
+    <link rel="stylesheet" href="/static/styles.css?v=61" />
     <title>TrimTime · Live Customer Queue & Bookings</title>
   </head>
   <body class="customer-page">
@@ -155,13 +155,13 @@
         </div>
         <p class="muted">Select your haircut, beard trim, or combo. Your wait time is dynamically calculated and updated minute-by-minute.</p>
         <form id="join-form">
-          <select id="shop" class="hidden" required></select>
+          <select id="shop" class="hidden"></select>
           <div class="form-row-2">
             <label>Your name <span class="mandatory-star">*</span>
               <input id="customer-name" required minlength="2" autocomplete="name" placeholder="Full name" />
             </label>
-            <label>Mobile number (for updates) <span class="mandatory-star">*</span>
-              <input id="phone" required minlength="10" inputmode="tel" autocomplete="tel" placeholder="10-digit number" />
+            <label>Mobile number (optional)
+              <input id="phone" inputmode="tel" autocomplete="tel" placeholder="10-digit number (optional)" />
             </label>
           </div>
 
@@ -309,7 +309,7 @@
 
     <footer>Built for calmer shops and better cuts.</footer>
     <script src="/static/branding.js?v=1" defer></script>
-    <script src="/static/app.js?v=80" defer></script>
+    <script src="/static/app.js?v=81" defer></script>
   </body>
 </html>
 

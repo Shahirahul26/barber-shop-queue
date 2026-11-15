@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><link rel="stylesheet" href="/static/styles.css?v=53" /><title>TrimTime · Staff dashboard</title></head>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><link rel="stylesheet" href="/static/styles.css?v=58" /><title>TrimTime · Staff dashboard</title></head>
 <body class="staff-page">
   <header class="topbar"><a class="brand" href="/">TRIM<span>TIME</span></a><a href="/customer">Customer view</a></header>
   <main class="staff-main">
@@ -21,36 +21,56 @@
       <div class="dashboard-nav-wrap"><nav class="dashboard-nav" aria-label="Staff dashboard sections"><button type="button" data-tab="queue" class="active"><span id="queue-nav-count" aria-label="Current queue count">0</span>Live queue</button><button type="button" data-tab="appointments"><span id="appointment-nav-count" aria-label="Appointment count">0</span>Appointments</button><button type="button" data-tab="walkin"><span class="nav-spacer" aria-hidden="true"></span>Generate token</button><button type="button" data-tab="account"><span class="nav-spacer" aria-hidden="true"></span>My account</button></nav>
       <nav id="account-management-nav" class="account-menu hidden" aria-label="My account management"><button type="button" data-tab="services" class="manager-only">Services</button><button type="button" data-tab="team" class="manager-only">Team & staff</button><button type="button" data-tab="analytics">Analytics</button><button type="button" data-tab="settings">Settings</button><button type="button" data-tab="shop" class="manager-only">Shop details & QR</button><button type="button" id="logout" class="account-logout">Log out</button></nav></div>
       <section id="tab-queue" class="tab-section">
-        <div class="panel toolbar"><button id="pause-queue" class="secondary">Pause new joins</button></div>
+        <div class="panel toolbar">
+          <button id="pause-queue" class="secondary">Pause new joins</button>
+          <button type="button" id="toolbar-open-walkin-btn" class="primary-action-btn">+ Generate walk-in token</button>
+        </div>
         <section id="queue-list" class="queue-list"></section>
       </section>
-      <section id="tab-walkin" class="tab-section hidden">
-        <form id="staff-queue-form" class="panel">
-          <p class="eyebrow">NEW CUSTOMER</p>
-          <h2>Add walk-in customer</h2>
-          <label>Customer name <span class="mandatory-star">*</span>
-            <input id="staff-queue-name" minlength="2" required placeholder="Full name" />
-          </label>
-          <label>Phone number (optional)
-            <input id="staff-queue-phone" minlength="10" inputmode="tel" placeholder="10-digit number" />
-          </label>
-          <label>Email address (optional)
-            <input id="staff-queue-email" type="email" placeholder="customer@example.com" />
-          </label>
-          <label>Services (select one or multiple) <span class="mandatory-star">*</span>
-            <div id="staff-queue-services-list" class="staff-services-checklist"></div>
-          </label>
-          <div id="staff-services-summary-bar" class="staff-services-summary-bar hidden">
-            <span>Selected: <strong id="staff-summary-names">—</strong></span>
-            <span>Total: <strong id="staff-summary-duration">0 min</strong> · <strong id="staff-summary-price">₹0</strong></span>
+      <div id="walkin-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="walkin-modal-title">
+        <div class="modal-card">
+          <div class="modal-header">
+            <div>
+              <p class="eyebrow">WALK-IN CUSTOMER</p>
+              <h2 id="walkin-modal-title">Generate walk-in token</h2>
+            </div>
+            <button type="button" id="close-walkin-modal" class="modal-close-btn" aria-label="Close modal">✕</button>
           </div>
-          <label>Barber (optional)
-            <select id="staff-queue-barber"></select>
-          </label>
-          <button id="staff-queue-submit" type="submit">Generate token & add to live queue</button>
-          <p id="staff-queue-result" class="form-result" aria-live="polite"></p>
-        </form>
-      </section>
+          <form id="staff-queue-form">
+            <div class="form-row-2">
+              <label>Customer name <span class="mandatory-star">*</span>
+                <input id="staff-queue-name" minlength="2" required placeholder="Full name" />
+              </label>
+              <label>Phone number (optional)
+                <input id="staff-queue-phone" inputmode="tel" placeholder="10-digit number" />
+              </label>
+            </div>
+            <label>Email address (optional)
+              <input id="staff-queue-email" type="email" placeholder="customer@example.com" />
+            </label>
+            <label>Select services (multiple allowed) <span class="mandatory-star">*</span>
+              <div id="staff-service-picker" class="service-checkbox-dropdown">
+                <button id="staff-service-toggle" type="button" aria-expanded="false">
+                  <span>Choose services</span><b>⌄</b>
+                </button>
+                <div id="staff-service-options" class="service-checkbox-options hidden"></div>
+              </div>
+            </label>
+            <div id="staff-services-summary-bar" class="staff-services-summary-bar hidden">
+              <span>Selected: <strong id="staff-summary-names">—</strong></span>
+              <span>Total: <strong id="staff-summary-duration">0 min</strong> · <strong id="staff-summary-price">₹0</strong></span>
+            </div>
+            <label>Assign barber (optional)
+              <select id="staff-queue-barber"></select>
+            </label>
+            <div class="modal-actions-row">
+              <button id="staff-queue-submit" type="submit" class="modal-submit-btn">Generate token & add to live queue <span>→</span></button>
+              <button type="button" id="cancel-walkin-modal" class="ghost">Cancel</button>
+            </div>
+            <p id="staff-queue-result" class="form-result" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
       <section id="tab-appointments" class="tab-section hidden"><div class="panel"><h2>Customer appointments</h2><p class="muted">Appointments are booked from the customer page. View and manage them here.</p></div><div id="appointment-list" class="queue-list"></div></section>
       <section id="tab-shop" class="tab-section hidden">
         <form id="shop-form" class="panel"><h2>Shop profile</h2><label>Shop name<input id="shop-profile-name" required /></label><label>Phone<input id="shop-phone" /></label><label>GST number<input id="shop-gst" maxlength="15" placeholder="27ABCDE1234F1Z5" /></label><label>Address<input id="shop-profile-address" required /></label><div class="geo-helper-card"><div class="geo-helper-header"><div class="geo-helper-title"><span class="geo-icon">📍</span><strong>Shop Location & Navigation (Free Google Maps)</strong></div><p class="small-note muted">Ensure customers can locate your shop and get Google Maps navigation:</p></div><div class="geo-action-buttons"><button type="button" id="shop-profile-geo-detect" class="geo-btn primary-geo"><span>📍</span> Detect my current location</button><button type="button" id="shop-profile-geo-from-address" class="geo-btn secondary-geo"><span>🔍</span> Find from address</button><button type="button" id="shop-profile-open-gmaps" class="geo-btn outline-geo"><span>🗺️</span> Open Google Maps</button></div><div class="geo-paste-row"><input id="shop-profile-geo-paste" type="text" placeholder="Or paste Google Maps link or coordinates (e.g. 19.0760, 72.8777)" /><button type="button" id="shop-profile-geo-apply-paste" class="secondary">Apply</button></div><p id="shop-profile-geo-status" class="geo-status-msg" aria-live="polite"></p><div id="shop-profile-map-container" class="map-picker-wrap hidden"><div class="map-picker-header"><span>Click anywhere on the map or drag the pin to set coordinates:</span><button type="button" id="shop-profile-map-close" class="ghost small-btn">Close map</button></div><div id="shop-profile-map-view" class="map-picker-canvas"></div></div><button type="button" id="shop-profile-toggle-map" class="toggle-map-btn"><span>🗺️</span> Pick / adjust on interactive map</button></div><label>Latitude<input id="shop-profile-latitude" type="number" step="any" min="-90" max="90" /></label><label>Longitude<input id="shop-profile-longitude" type="number" step="any" min="-180" max="180" /></label><label>Opening time<input id="opens-at" type="time" required /></label><label>Closing time<input id="closes-at" type="time" required /></label><label>Timezone<input id="shop-timezone" required /></label><button type="submit">Save shop details</button></form>
@@ -75,6 +95,6 @@
   </main>
   <script src="/static/branding.js?v=1" defer></script><script id="google-identity-script" src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="/static/staff.js?v=57" defer></script>
+  <script src="/static/staff.js?v=58" defer></script>
 </body>
 </html>

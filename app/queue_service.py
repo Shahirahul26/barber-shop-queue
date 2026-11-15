@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_, case, select
 from sqlalchemy.orm import Session, joinedload
 
-from .models import Appointment, Barber, QueueEntry, QueueStatus
+from .models import Appointment, Barber, QueueEntry, QueueStatus, Shop
 
 
 ACTIVE_STATUSES = (QueueStatus.WAITING, QueueStatus.SERVING)
@@ -77,6 +78,12 @@ def queue_metrics(db: Session, shop_id: int) -> tuple[dict[int, dict], int]:
 
     metrics: dict[int, dict] = {}
     waiting_index = 0
+    shop = db.get(Shop, shop_id)
+    try:
+        shop_tz = ZoneInfo(shop.timezone) if shop and shop.timezone else ZoneInfo("Asia/Kolkata")
+    except Exception:
+        shop_tz = timezone.utc
+
     for entry in (item for item in entries if item.status == QueueStatus.WAITING):
         if entry.barber_id is not None and entry.barber_id not in workloads:
             metrics[entry.id] = {"wait": 0, "ahead": 0,
@@ -88,9 +95,22 @@ def queue_metrics(db: Session, shop_id: int) -> tuple[dict[int, dict], int]:
         # Any-barber customers display stable FIFO service rounds. Barber-specific
         # customers display only the work queued on their selected barber's lane.
         ahead = waiting_index // len(barber_ids) if entry.barber_id is None else customers_before[assigned]
-        adjusted_wait = wait_with_reservations(assigned, duration)
-        metrics[entry.id] = {"wait": adjusted_wait, "ahead": ahead, "message": None}
-        workloads[assigned] = adjusted_wait + duration
+        if entry.source == "appointment":
+            entry_time = entry.joined_at if entry.joined_at.tzinfo else entry.joined_at.replace(tzinfo=timezone.utc)
+            if entry_time > now:
+                mins_to_start = max(0, int((entry_time - now).total_seconds() // 60))
+                adjusted_wait = mins_to_start
+                time_str = entry_time.astimezone(shop_tz).strftime("%I:%M %p")
+                msg = f"Scheduled for {time_str}"
+            else:
+                adjusted_wait = wait_with_reservations(assigned, duration)
+                msg = "Priority appointment active"
+                workloads[assigned] = adjusted_wait + duration
+        else:
+            adjusted_wait = wait_with_reservations(assigned, duration)
+            msg = None
+            workloads[assigned] = adjusted_wait + duration
+        metrics[entry.id] = {"wait": adjusted_wait, "ahead": ahead, "message": msg}
         customers_before[assigned] += 1
         waiting_index += 1
     return metrics, len(barber_ids)

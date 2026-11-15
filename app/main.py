@@ -218,9 +218,16 @@ def promote_due_appointments(db: Session, shop_id: int | None = None) -> set[int
         if not shop:
             continue
         scheduled_at = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
+        try:
+            shop_tz = ZoneInfo(shop.timezone) if shop and shop.timezone else ZoneInfo("Asia/Kolkata")
+        except Exception:
+            shop_tz = ZoneInfo("Asia/Kolkata")
+        booking_local_date = scheduled_at.astimezone(shop_tz).date()
+        current_local_date = datetime.now(shop_tz).date()
         grace = shop.appointment_grace_minutes if shop else 10
         queue_entry_time = scheduled_at - timedelta(minutes=grace)
-        if queue_entry_time > now:
+        is_today_or_due = (booking_local_date <= current_local_date) or (now >= queue_entry_time)
+        if not is_today_or_due:
             continue
 
         existing = db.scalar(select(QueueEntry).where(QueueEntry.appointment_id == appointment.id))
@@ -1749,7 +1756,7 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
 
     item = Appointment(
         shop_id=shop_id,
-        customer_id=customer.id if customer else None,
+        customer_id=None if payload.book_for_other else (customer.id if customer else None),
         service_id=service.id,
         service_ids=service_ids,
         service_names=service_names,
@@ -1769,7 +1776,11 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
     now_utc = datetime.now(timezone.utc)
     grace = shop.appointment_grace_minutes if shop else 10
     queue_entry_time = item.scheduled_at - timedelta(minutes=grace)
-    if now_utc >= queue_entry_time:
+    booking_local_date = item.scheduled_at.astimezone(shop_timezone).date()
+    current_local_date = datetime.now(shop_timezone).date()
+    is_today_or_due = (booking_local_date <= current_local_date) or (now_utc >= queue_entry_time)
+
+    if is_today_or_due:
         queue_entry = QueueEntry(
             appointment_id=item.id,
             shop_id=shop_id,
