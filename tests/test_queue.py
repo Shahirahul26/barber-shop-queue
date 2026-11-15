@@ -558,5 +558,29 @@ def test_customer_can_book_for_other_without_duplicate_conflict():
         assert res_other.json()["customer_name"] == "Rohan Kumar (Age: 16)"
 
 
+def test_generate_token_with_multiple_services_for_walkin_and_online():
+    with TestClient(app) as client:
+        shop = client.get("/api/shops/1").json()
+        assert len(shop["services"]) >= 2
+        s1 = shop["services"][0]
+        s2 = shop["services"][1]
+        expected_names = f"{s1['name']}, {s2['name']}"
+
+        # 1. Barber / staff generates walk-in token with multiple services
+        login = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        auth = {"Authorization": f"Bearer {login['access_token']}"}
+        walkin_res = client.post("/api/shops/1/queue", headers=auth, json={
+            "customer_name": "Multi Service Walkin",
+            "phone": "9811223344",
+            "service_ids": [s1["id"], s2["id"]],
+            "source": "walk_in"
+        })
+        assert walkin_res.status_code == 201
+        entry = walkin_res.json()
+        assert entry["service_ids"] == [s1["id"], s2["id"]]
+        assert entry["service_name"] == expected_names
+        assert entry["source"] == "walk_in"
+
+
 
 

@@ -532,9 +532,43 @@ function renderRangeAnalytics(data) {
   document.querySelector("#analytics-grid").innerHTML = `<article class="mini-card"><span>Revenue</span><strong>&#8377;${data.estimated_revenue_rupees}</strong></article><article class="mini-card"><span>Completed services</span><strong>${data.completed_services}</strong></article><article class="mini-card"><span>Appointments</span><strong>${data.appointments || 0}</strong></article><article class="mini-card"><span>Cancelled appointments</span><strong>${data.cancelled_appointments || 0}</strong></article><article class="mini-card"><span>Queue entries</span><strong>${data.total_queue_entries || 0}</strong></article>${barberCards}<div class="analytics-daily"><h2>Daily revenue &middot; ${formatReportDate(data.range_start)} to ${formatReportDate(data.range_end)}</h2><div class="management-grid">${dailySection}</div></div>`;
 }
 
+function updateStaffServicesSummary() {
+  const checked = [...document.querySelectorAll('#staff-queue-services-list input[name="staff_service"]:checked')];
+  const summaryBar = document.querySelector("#staff-services-summary-bar");
+  if (!summaryBar) return;
+  if (checked.length === 0) {
+    summaryBar.classList.add("hidden");
+    return;
+  }
+  summaryBar.classList.remove("hidden");
+  const names = checked.map((input) => input.dataset.name).join(", ");
+  const totalDuration = checked.reduce((acc, input) => acc + Number(input.dataset.duration), 0);
+  const totalPrice = checked.reduce((acc, input) => acc + Number(input.dataset.price), 0);
+  document.querySelector("#staff-summary-names").textContent = names;
+  document.querySelector("#staff-summary-duration").textContent = `${totalDuration} min`;
+  document.querySelector("#staff-summary-price").textContent = `₹${totalPrice}`;
+}
+
 function fillStaffBarberSelect() {
   document.querySelector("#staff-barber").innerHTML = `<option value="">Not applicable</option>${shop.barbers.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("")}`;
-  document.querySelector("#staff-queue-service").innerHTML = (shop.services && shop.services.length) ? shop.services.map((item) => `<option value="${item.id}">${escapeHtml(item.name)} · ${item.duration_minutes} min</option>`).join("") : '<option value="">No services available (add a service first)</option>';
+  const servicesList = document.querySelector("#staff-queue-services-list");
+  if (servicesList) {
+    servicesList.innerHTML = (shop.services && shop.services.length)
+      ? shop.services.map((item) => `
+        <label class="staff-service-option">
+          <input type="checkbox" name="staff_service" value="${item.id}" data-name="${escapeHtml(item.name)}" data-duration="${item.duration_minutes}" data-price="${item.price_rupees}" />
+          <span class="staff-service-option-content">
+            <strong>${escapeHtml(item.name)}</strong>
+            <small>${item.duration_minutes} min · ₹${item.price_rupees}</small>
+          </span>
+        </label>
+      `).join("")
+      : '<p class="muted">No services available (add a service first).</p>';
+    servicesList.querySelectorAll('input[name="staff_service"]').forEach((input) => {
+      input.addEventListener("change", updateStaffServicesSummary);
+    });
+    updateStaffServicesSummary();
+  }
   const queueBarbers = staffRole === "barber" ? shop.barbers.filter((item) => item.id === staffBarberId) : shop.barbers;
   const queueBarberSelect = document.querySelector("#staff-queue-barber");
   queueBarberSelect.innerHTML = `${staffRole === "barber" ? "" : '<option value="">Any available barber</option>'}${queueBarbers.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join("")}`;
@@ -699,10 +733,22 @@ document.querySelector("#staff-queue-form").addEventListener("submit", async (ev
   result.className = "form-result"; result.textContent = "";
   const barberId = document.querySelector("#staff-queue-barber").value;
   try {
-    const serviceId = Number(document.querySelector("#staff-queue-service").value);
-    if (!serviceId) throw new Error("Please select a service before adding the customer.");
+    const checkedServices = [...document.querySelectorAll('#staff-queue-services-list input[name="staff_service"]:checked')];
+    if (!checkedServices.length) throw new Error("Please select at least one service before adding the customer.");
+    const serviceIds = checkedServices.map((input) => Number(input.value));
     submit.disabled = true; submit.textContent = "Adding customer...";
-    const created = await request(`/api/shops/${shopId}/queue`, { method: "POST", body: JSON.stringify({ customer_name: document.querySelector("#staff-queue-name").value.trim(), phone: document.querySelector("#staff-queue-phone").value.trim() || null, email: document.querySelector("#staff-queue-email").value.trim().toLowerCase() || null, service_id: serviceId, barber_id: barberId ? Number(barberId) : null, source: "walk_in" }) });
+    const created = await request(`/api/shops/${shopId}/queue`, {
+      method: "POST",
+      body: JSON.stringify({
+        customer_name: document.querySelector("#staff-queue-name").value.trim(),
+        phone: document.querySelector("#staff-queue-phone").value.trim() || null,
+        email: document.querySelector("#staff-queue-email").value.trim().toLowerCase() || null,
+        service_id: serviceIds[0],
+        service_ids: serviceIds,
+        barber_id: barberId ? Number(barberId) : null,
+        source: "walk_in"
+      })
+    });
     event.target.reset(); fillStaffBarberSelect();
     const queueEntries = await request(`/api/shops/${shopId}/queue`);
     renderQueue(queueEntries); document.querySelector("#queue-nav-count").textContent = queueEntries.filter((entry) => ["waiting", "serving"].includes(entry.status)).length;

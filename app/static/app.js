@@ -809,18 +809,25 @@ function renderJoinServiceCards(services) {
 
   container.querySelectorAll(".service-card-choice").forEach((card) => {
     card.addEventListener("click", () => {
-      container.querySelectorAll(".service-card-choice").forEach((c) => c.classList.remove("selected"));
-      card.classList.add("selected");
-      const serviceId = card.dataset.serviceId;
-      select.value = serviceId;
+      card.classList.toggle("selected");
 
+      const selectedCards = [...container.querySelectorAll(".service-card-choice.selected")];
       const banner = document.querySelector("#join-selected-service-banner");
-      if (banner) {
-        banner.classList.remove("hidden");
-        document.querySelector("#join-selected-service-name").textContent = card.dataset.name;
-        document.querySelector("#join-selected-service-meta").textContent = `${card.dataset.duration} mins · ₹${card.dataset.price}`;
-        const baseWait = Number(currentShop?.estimated_wait_minutes || 0);
-        document.querySelector("#join-service-est-wait").textContent = `~${baseWait} min wait`;
+      if (selectedCards.length > 0) {
+        select.value = selectedCards[0].dataset.serviceId;
+        if (banner) {
+          banner.classList.remove("hidden");
+          const names = selectedCards.map((c) => c.dataset.name).join(", ");
+          const totalDuration = selectedCards.reduce((acc, c) => acc + Number(c.dataset.duration), 0);
+          const totalPrice = selectedCards.reduce((acc, c) => acc + Number(c.dataset.price), 0);
+          document.querySelector("#join-selected-service-name").textContent = names;
+          document.querySelector("#join-selected-service-meta").textContent = `${totalDuration} mins · ₹${totalPrice}`;
+          const baseWait = Number(currentShop?.estimated_wait_minutes || 0);
+          document.querySelector("#join-service-est-wait").textContent = `~${baseWait} min wait`;
+        }
+      } else {
+        select.value = "";
+        if (banner) banner.classList.add("hidden");
       }
       document.querySelector("#form-error").textContent = "";
     });
@@ -1334,11 +1341,12 @@ document.querySelector("#join-form").addEventListener("submit", async (event) =>
   event.preventDefault();
   const error = document.querySelector("#form-error");
   error.textContent = "";
-  const serviceVal = document.querySelector("#service").value;
-  if (!serviceVal) {
-    error.textContent = "Selecting a service is mandatory to join the live queue and calculate wait time.";
+  const selectedCards = [...document.querySelectorAll("#join-services-grid .service-card-choice.selected")];
+  if (!selectedCards.length) {
+    error.textContent = "Selecting at least one service is mandatory to join the live queue.";
     return;
   }
+  const serviceIds = selectedCards.map((c) => Number(c.dataset.serviceId));
   try {
     const barber = document.querySelector("#barber").value;
     const entry = await api(`/api/shops/${shopId}/queue`, {
@@ -1346,7 +1354,8 @@ document.querySelector("#join-form").addEventListener("submit", async (event) =>
       body: JSON.stringify({
         customer_name: document.querySelector("#customer-name").value.trim(),
         phone: document.querySelector("#phone").value.trim() || null,
-        service_id: Number(serviceVal),
+        service_id: serviceIds[0],
+        service_ids: serviceIds,
         barber_id: barber ? Number(barber) : null,
         source: "online"
       })
