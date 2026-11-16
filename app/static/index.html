@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="stylesheet" href="/static/styles.css?v=61" />
+    <link rel="stylesheet" href="/static/styles.css?v=75" />
     <title>TrimTime · Live Customer Queue & Bookings</title>
   </head>
   <body class="customer-page">
@@ -33,33 +33,78 @@
         <div id="otp-request-step">
           <p id="customer-auth-eyebrow" class="eyebrow">CUSTOMER ACCESS</p>
           <h2 id="customer-auth-title">Sign in with email</h2>
-          <p id="customer-auth-copy" class="muted">Enter your email address to receive a secure OTP code. You only need to verify once on this device.</p>
-          <form id="otp-request-form" class="single-column-form">
+          <p id="customer-auth-copy" class="muted">Enter your registered email address to receive a secure OTP code. You only need to verify once on this device.</p>
+          <form id="otp-request-form" class="single-column-form" action="javascript:void(0);">
             <label>Email address
               <input id="customer-identifier" type="email" autocomplete="email" placeholder="you@example.com" required />
             </label>
             <button id="send-otp-button">Send verification code <span>→</span></button>
           </form>
+          <p class="auth-switch-note muted">New to TrimTime? <button type="button" id="switch-to-signup-link" class="auth-text-link">Create a customer account</button></p>
+        </div>
+
+        <div id="customer-signup-step" class="hidden">
+          <p class="eyebrow">NEW CUSTOMER REGISTRATION</p>
+          <h2>Create your customer account</h2>
+          <p class="muted">Fill in your details below to register, track live queues, and book appointments.</p>
+          <form id="customer-signup-form" class="single-column-form" action="javascript:void(0);">
+            <label>Your full name <span style="color:#dc2626;">*</span>
+              <input id="signup-name" minlength="2" maxlength="100" autocomplete="name" placeholder="Full name" required />
+            </label>
+            <label>Email address <span style="color:#dc2626;">*</span>
+              <input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com" required />
+            </label>
+            <div class="form-row-2">
+              <label>Age <span style="color:#dc2626;">*</span>
+                <input id="signup-age" type="number" min="5" max="110" placeholder="e.g. 26" required />
+              </label>
+              <label>Gender <span style="color:#dc2626;">*</span>
+                <select id="signup-gender" required>
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="non_binary">Non-binary</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </select>
+              </label>
+            </div>
+            <label>Mobile number (optional)
+              <input id="signup-phone" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number (optional)" />
+            </label>
+            <label>6-digit MPIN for fast login (optional)
+              <input id="signup-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" />
+            </label>
+            <label class="terms-check">
+              <input id="signup-terms" type="checkbox" required />
+              <span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span>
+            </label>
+            <button type="submit" id="signup-submit-btn">Create account & continue <span>→</span></button>
+          </form>
+          <p class="auth-switch-note muted">Already have an account? <button type="button" id="switch-to-signin-link" class="auth-text-link">Sign in here</button></p>
         </div>
 
         <div id="otp-verify-step" class="hidden">
           <p class="eyebrow">VERIFY EMAIL</p>
           <h2>Enter verification OTP</h2>
+          <div id="otp-dev-helper" class="otp-dev-banner hidden"></div>
           <p id="otp-message" class="muted"></p>
-          <form id="otp-verify-form" class="single-column-form">
+          <form id="otp-verify-form" class="single-column-form" action="javascript:void(0);">
             <label>6-digit OTP code
               <input id="customer-otp" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="123456" required />
             </label>
-            <button>Verify and continue <span>→</span></button>
+            <button id="verify-otp-submit-btn">Verify and continue <span>→</span></button>
           </form>
-          <button id="resend-customer-otp" class="forgot-link" type="button">Resend OTP</button>
+          <div class="otp-actions-row">
+            <button id="resend-customer-otp" class="forgot-link" type="button">Resend OTP</button>
+            <button id="otp-back-btn" class="forgot-link" type="button">← Change email / edit details</button>
+          </div>
         </div>
 
         <div id="customer-profile-step" class="hidden">
           <p class="eyebrow">WELCOME TO TRIMTIME</p>
           <h2>Complete your profile</h2>
           <div id="customer-profile-ad" class="profile-ad-image"></div>
-          <form id="customer-profile-form" class="single-column-form">
+          <form id="customer-profile-form" class="single-column-form" action="javascript:void(0);">
             <label>Your full name
               <input id="verified-customer-name" minlength="2" autocomplete="name" placeholder="Full name" required />
             </label>
@@ -91,7 +136,7 @@
             <button type="button" id="switch-account-btn" class="switch-account-btn">Use another email</button>
           </div>
           <p id="customer-mpin-copy" class="muted">Enter your MPIN to sign in quickly on this trusted device.</p>
-          <form id="customer-mpin-form" class="single-column-form">
+          <form id="customer-mpin-form" class="single-column-form" action="javascript:void(0);">
             <label>6-digit MPIN
               <input id="customer-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" required />
             </label>
@@ -100,7 +145,10 @@
             </label>
             <button id="customer-mpin-submit">Sign in <span>→</span></button>
           </form>
-          <button id="forgot-customer-mpin" class="forgot-link hidden" type="button">Forgot MPIN? Verify with OTP</button>
+          <div class="otp-actions-row">
+            <button id="forgot-customer-mpin" class="forgot-link" type="button">Sign in with Email OTP instead</button>
+            <button id="mpin-to-signup-link" class="forgot-link" type="button">New customer? Sign up</button>
+          </div>
         </div>
 
         <p id="customer-auth-error" class="error" role="alert"></p>
@@ -156,9 +204,9 @@
         <p class="muted">Select your haircut, beard trim, or combo. Your wait time is dynamically calculated and updated minute-by-minute.</p>
         <form id="join-form">
           <select id="shop" class="hidden"></select>
-          <div class="form-row-2">
+          <div class="form-row-2 hidden">
             <label>Your name <span class="mandatory-star">*</span>
-              <input id="customer-name" required minlength="2" autocomplete="name" placeholder="Full name" />
+              <input id="customer-name" minlength="2" autocomplete="name" placeholder="Full name" />
             </label>
             <label>Mobile number (optional)
               <input id="phone" inputmode="tel" autocomplete="tel" placeholder="10-digit number (optional)" />
@@ -183,11 +231,11 @@
             <span class="est-wait-pill" id="join-service-est-wait">~12 min wait</span>
           </div>
 
-          <label>Choose a preferred barber (optional)
+          <label class="hidden">Choose a preferred barber (optional)
             <select id="barber"></select>
           </label>
           <span id="prejoin-wait" class="hidden">0</span>
-          <button type="submit" id="join-queue-submit-btn">Confirm & Join Live Queue <span>→</span></button>
+          <button type="submit" id="join-queue-submit-btn">Add to Join Live Queue <span>→</span></button>
         </form>
         <p id="form-error" class="error" role="alert"></p>
       </section>
@@ -205,32 +253,68 @@
         </div>
 
         <div id="appointment-other-fields" class="appointment-other-fields hidden">
-          <div class="form-row-2">
-            <label>Person's name <span class="mandatory-star">*</span>
+          <div class="appointment-form-row">
+            <div class="appointment-field-group">
+              <div class="field-label-line">
+                <span class="field-label-text">Person's name</span>
+                <span class="mandatory-pill">*Required</span>
+              </div>
               <input id="appointment-other-name" minlength="2" placeholder="Full name of person" />
-            </label>
-            <label>Person's age <span class="mandatory-star">*</span>
+            </div>
+            <div class="appointment-field-group">
+              <div class="field-label-line">
+                <span class="field-label-text">Person's age</span>
+                <span class="mandatory-pill">*Required</span>
+              </div>
               <input id="appointment-other-age" type="number" min="1" max="120" placeholder="e.g. 25" />
-            </label>
+            </div>
           </div>
-          <label>Contact phone (optional)
-            <input id="appointment-other-phone" inputmode="tel" placeholder="Mobile number" />
-          </label>
+          <div class="appointment-form-row single-field">
+            <div class="appointment-field-group">
+              <div class="field-label-line">
+                <span class="field-label-text">Contact phone</span>
+                <span class="optional-pill">Optional</span>
+              </div>
+              <input id="appointment-other-phone" inputmode="tel" placeholder="Mobile number" />
+            </div>
+          </div>
         </div>
 
         <form id="appointment-form">
-          <label>1. Choose services <span class="mandatory-star">*Required</span>
-            <div id="appointment-service-picker" class="service-checkbox-dropdown">
-              <button id="appointment-service-toggle" type="button" aria-expanded="false">
-                <span>Choose services</span><b>⌄</b>
-              </button>
-              <div id="appointment-service-options" class="service-checkbox-options hidden"></div>
+          <div class="appointment-form-row">
+            <div class="appointment-field-group">
+              <div class="field-label-line">
+                <span class="field-label-text">1. Choose services</span>
+                <span class="mandatory-pill">*Required</span>
+              </div>
+              <div id="appointment-service-picker" class="service-checkbox-dropdown">
+                <button id="appointment-service-toggle" type="button" aria-expanded="false">
+                  <span>Choose services</span><b>⌄</b>
+                </button>
+                <div id="appointment-service-options" class="service-checkbox-options hidden"></div>
+              </div>
+              <small class="field-help">Select one or more services to calculate service duration and show open slots.</small>
             </div>
-            <small class="field-help">Select one or more services to calculate service duration and show open slots.</small>
-          </label>
 
-          <label>2. Choose a barber (optional)<select id="appointment-barber"></select></label>
-          <label>3. Choose appointment date<input id="appointment-date" type="date" required /></label>
+            <div class="appointment-field-group">
+              <div class="field-label-line">
+                <span class="field-label-text">2. Choose a barber</span>
+                <span class="optional-pill">Optional</span>
+              </div>
+              <select id="appointment-barber"></select>
+              <small class="field-help">Choose preferred barber or leave for first available.</small>
+            </div>
+          </div>
+
+          <div class="appointment-form-row single-field">
+            <div class="appointment-field-group">
+              <div class="field-label-line">
+                <span class="field-label-text">3. Choose appointment date</span>
+                <span class="mandatory-pill">*Required</span>
+              </div>
+              <input id="appointment-date" type="date" required />
+            </div>
+          </div>
 
           <div class="appointment-slot-container">
             <div class="slot-container-header">
@@ -265,51 +349,18 @@
         <div id="appointment-result" class="appointment-result-box" aria-live="polite"></div>
       </section>
 
-      <section id="appointment-ticket-panel" class="panel ticket hidden" aria-live="polite">
-        <p class="eyebrow">YOUR APPOINTMENT TICKET</p>
-        <div class="ticket-head">
-          <h2 id="appointment-ticket-token">B01</h2>
-          <span id="appointment-ticket-status">Booked</span>
-        </div>
-        <p id="appointment-ticket-details"></p>
-        <p id="appointment-ticket-message" class="muted"></p>
-        <button id="cancel-appointment" class="ghost" type="button">Cancel appointment</button>
-        <button id="rate-appointment" class="secondary hidden" type="button">Rate completed service</button>
-        <form id="appointment-rating-form" class="history-inline-rating hidden">
-          <div class="history-rating-grid">
-            <fieldset class="star-field"><legend>Shop rating</legend><input id="appointment-shop-rating" type="hidden" /><div class="star-rating" data-rating-input="appointment-shop-rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>
-            <fieldset class="star-field"><legend>Barber rating</legend><input id="appointment-barber-rating" type="hidden" /><div class="star-rating" data-rating-input="appointment-barber-rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>
-          </div>
-          <label>Feedback (optional)<textarea id="appointment-feedback" maxlength="500" placeholder="Share your experience"></textarea></label>
-          <button type="submit">Submit</button>
-          <p id="appointment-rating-result" class="history-result"></p>
-        </form>
-        <button id="appointment-rebook" class="rebook-service hidden" type="button">Rebook service <span>›</span></button>
+      <section id="appointment-ticket-panel" class="appointment-tickets-section hidden" aria-live="polite">
+        <div id="appointment-tickets-container"></div>
       </section>
 
-      <section id="ticket-panel" class="panel ticket hidden" aria-live="polite">
-        <p class="eyebrow">YOUR LIVE TICKET</p>
-        <div class="ticket-head"><h2 id="ticket-token">A01</h2><span id="ticket-status">Waiting</span></div>
-        <div class="ticket-grid">
-          <div><strong id="people-ahead">—</strong><span id="ahead-label">people ahead</span></div>
-          <div><strong id="ticket-wait">—</strong><span id="ticket-wait-unit">minutes estimated</span></div>
-        </div>
-        <p>Barber: <strong id="ticket-barber">First available barber</strong></p>
-        <button id="notify" class="secondary">Enable live browser alerts</button>
-        <button id="leave-queue" class="secondary">Leave queue</button>
-        <form id="rating-form" class="hidden">
-          <h2>Rate completed service</h2>
-          <fieldset class="star-field"><legend>Shop rating (1–5)</legend><input id="shop-rating" type="hidden" /><div class="star-rating" data-rating-input="shop-rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>
-          <label>Shop feedback (optional)<textarea id="shop-review" maxlength="500" placeholder="Tell us about the shop"></textarea></label>
-          <button type="submit">Submit feedback</button>
-        </form>
-        <p id="rating-result" class="success"></p>
+      <section id="ticket-panel" class="queue-tickets-section hidden" aria-live="polite">
+        <div id="queue-tickets-container"></div>
       </section>
     </main>
 
     <footer>Built for calmer shops and better cuts.</footer>
     <script src="/static/branding.js?v=1" defer></script>
-    <script src="/static/app.js?v=81" defer></script>
+    <script src="/static/app.js?v=93" defer></script>
   </body>
 </html>
 

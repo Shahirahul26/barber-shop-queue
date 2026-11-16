@@ -17,11 +17,11 @@ let customerToken = sessionStorage.getItem("trimtimeCustomerToken");
 const customerDeviceId = localStorage.getItem("trimtimeCustomerDeviceId") || crypto.randomUUID();
 localStorage.setItem("trimtimeCustomerDeviceId", customerDeviceId);
 let activeToken = localStorage.getItem("trimtimeQueueToken");
-let currentQueueEntry = null;
+let currentQueueEntry = null, activeQueueEntries = [];
 let activeAppointmentToken = localStorage.getItem("trimtimeAppointmentToken");
 let lastPeopleAhead = null;
 let historyRatingTarget = null;
-let customerHistoryItems = [], activeAppointmentDetails = null;
+let customerHistoryItems = [], activeAppointmentDetails = null, activeAppointments = [];
 const customerAuthMode = new URLSearchParams(location.search).get("auth");
 let customerHistoryDrafts = {};
 try { customerHistoryDrafts = JSON.parse(sessionStorage.getItem("trimtimeHistoryRatingDrafts") || "{}"); } catch { customerHistoryDrafts = {}; }
@@ -56,12 +56,40 @@ const joinPanel = document.querySelector("#join-panel");
 const ticketPanel = document.querySelector("#ticket-panel");
 const customerHero = document.querySelector("#customer-app .hero");
 document.querySelectorAll("#history-rating-form button[type=submit],#rating-form button[type=submit]").forEach((button) => { button.textContent = "Submit"; });
-document.querySelector("#history-shop-rating").closest(".star-field").insertAdjacentHTML("afterend", '<fieldset class="star-field"><legend>Barber rating</legend><input id="history-barber-rating" type="hidden" /><div class="star-rating" data-rating-input="history-barber-rating" aria-label="Barber rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>');
-document.querySelector("#shop-rating").closest(".star-field").insertAdjacentHTML("afterend", '<fieldset class="star-field"><legend>Barber rating</legend><input id="barber-rating" type="hidden" /><div class="star-rating" data-rating-input="barber-rating" aria-label="Barber rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>');
-customerHero.insertAdjacentElement("afterend", joinPanel);
-joinPanel.insertAdjacentElement("afterend", document.querySelector("#appointment-panel"));
-document.querySelector("#customer-app").appendChild(document.querySelector(".marketplace-section"));
+const historyShopRating = document.querySelector("#history-shop-rating");
+if (historyShopRating && !document.querySelector("#history-barber-rating")) {
+  historyShopRating.closest(".star-field")?.insertAdjacentHTML("afterend", '<fieldset class="star-field"><legend>Barber rating</legend><input id="history-barber-rating" type="hidden" /><div class="star-rating" data-rating-input="history-barber-rating" aria-label="Barber rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>');
+}
+const shopRating = document.querySelector("#shop-rating");
+if (shopRating && !document.querySelector("#barber-rating")) {
+  shopRating.closest(".star-field")?.insertAdjacentHTML("afterend", '<fieldset class="star-field"><legend>Barber rating</legend><input id="barber-rating" type="hidden" /><div class="star-rating" data-rating-input="barber-rating" aria-label="Barber rating"><button type="button" data-rating-value="1">★</button><button type="button" data-rating-value="2">★</button><button type="button" data-rating-value="3">★</button><button type="button" data-rating-value="4">★</button><button type="button" data-rating-value="5">★</button></div></fieldset>');
+}
+if (customerHero && joinPanel) customerHero.insertAdjacentElement("afterend", joinPanel);
+const apptPanel = document.querySelector("#appointment-panel");
+if (joinPanel && apptPanel) joinPanel.insertAdjacentElement("afterend", apptPanel);
+const custApp = document.querySelector("#customer-app");
+const mktSection = document.querySelector(".marketplace-section");
+if (custApp && mktSection) custApp.appendChild(mktSection);
 let currentCustomerAuthMode = customerAuthMode === "signup" ? "signup" : "signin";
+let pendingSignupProfile = null;
+
+function showOtpRequestSignIn() {
+  ["#customer-signup-step", "#customer-mpin-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+  document.querySelector("#otp-request-step")?.classList.remove("hidden");
+
+  const eyebrow = document.querySelector("#customer-auth-eyebrow");
+  const title = document.querySelector("#customer-auth-title");
+  const copy = document.querySelector("#customer-auth-copy");
+  const submitBtn = document.querySelector("#send-otp-button");
+
+  if (eyebrow) eyebrow.textContent = "CUSTOMER ACCESS";
+  if (title) title.textContent = "Sign in with email";
+  if (copy) copy.textContent = "Enter your registered email address to receive a secure OTP code. You only need to verify once on this device.";
+  if (submitBtn) submitBtn.innerHTML = "Send verification code <span>→</span>";
+
+  const identInput = document.querySelector("#customer-identifier");
+  if (identInput) identInput.focus();
+}
 
 function setCustomerAuthMode(mode) {
   currentCustomerAuthMode = mode;
@@ -70,29 +98,48 @@ function setCustomerAuthMode(mode) {
   document.querySelector("#auth-tab-signin")?.setAttribute("aria-selected", String(mode === "signin"));
   document.querySelector("#auth-tab-signup")?.setAttribute("aria-selected", String(mode === "signup"));
 
-  const eyebrow = document.querySelector("#customer-auth-eyebrow");
-  const title = document.querySelector("#customer-auth-title");
-  const copy = document.querySelector("#customer-auth-copy");
-  const submitBtn = document.querySelector("#send-otp-button");
+  const errorEl = document.querySelector("#customer-auth-error");
+  if (errorEl) errorEl.textContent = "";
+  const statusEl = document.querySelector("#customer-auth-status");
+  if (statusEl) statusEl.textContent = "";
 
   if (mode === "signup") {
-    if (eyebrow) eyebrow.textContent = "NEW CUSTOMER";
-    if (title) title.textContent = "Create customer account";
-    if (copy) copy.textContent = "Enter your email address. We will verify it with a 10-minute OTP, then complete your profile.";
-    if (submitBtn) submitBtn.innerHTML = "Get started with OTP <span>→</span>";
+    // Open the new customer signup form directly
+    ["#otp-request-step", "#customer-mpin-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+    document.querySelector("#customer-signup-step")?.classList.remove("hidden");
+    const nameInput = document.querySelector("#signup-name");
+    if (nameInput) nameInput.focus();
   } else {
-    if (eyebrow) eyebrow.textContent = "CUSTOMER ACCESS";
-    if (title) title.textContent = "Sign in with email";
-    if (copy) copy.textContent = "Enter your email address to receive a secure OTP code. You only need to verify once on this device.";
-    if (submitBtn) submitBtn.innerHTML = "Send verification code <span>→</span>";
+    // Sign In Mode: Check if device has saved email with MPIN
+    ["#customer-signup-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+    const savedEmail = localStorage.getItem("trimtimeCustomerEmail");
+    if (savedEmail && customerDeviceId) {
+      fetch("/api/customer-auth/check-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: savedEmail, device_id: customerDeviceId })
+      }).then((r) => r.json()).then((check) => {
+        if (check.mpin_login && currentCustomerAuthMode === "signin") {
+          pendingIdentifier = savedEmail;
+          showCustomerMpin("login", check.name || null);
+          return;
+        }
+        if (currentCustomerAuthMode === "signin") showOtpRequestSignIn();
+      }).catch(() => {
+        if (currentCustomerAuthMode === "signin") showOtpRequestSignIn();
+      });
+    } else {
+      showOtpRequestSignIn();
+    }
   }
 }
 
 document.querySelector("#auth-tab-signin")?.addEventListener("click", () => setCustomerAuthMode("signin"));
 document.querySelector("#auth-tab-signup")?.addEventListener("click", () => setCustomerAuthMode("signup"));
-if (customerAuthMode === "signup") {
-  setCustomerAuthMode("signup");
-}
+document.querySelector("#switch-to-signup-link")?.addEventListener("click", () => setCustomerAuthMode("signup"));
+document.querySelector("#switch-to-signin-link")?.addEventListener("click", () => setCustomerAuthMode("signin"));
+document.querySelector("#mpin-to-signup-link")?.addEventListener("click", () => setCustomerAuthMode("signup"));
+setCustomerAuthMode(customerAuthMode === "signup" ? "signup" : "signin");
 
 function formatApiError(detail) {
   if (Array.isArray(detail)) return detail.map((item) => `${(item.loc || []).filter((part) => part !== "body").join(" → ") || "Input"}: ${item.msg || "Invalid value"}`).join(" | ");
@@ -129,7 +176,7 @@ function showCustomerApp(customer) {
     sessionStorage.removeItem("trimtimeScannedShopId");
     sessionStorage.removeItem("trimtimeActiveShopId");
   }
-  loadShops().then(() => Promise.all([restoreActiveQueue(), restoreActiveAppointment()])).catch((reason) => showCustomerNotice(reason.message));
+  loadShops().then(() => Promise.all([restoreActiveQueues(), restoreActiveAppointments()])).catch((reason) => showCustomerNotice(reason.message));
 }
 function showCustomerNotice(message, success = false) {
   const notice = document.querySelector("#customer-notice"); clearTimeout(customerNoticeTimer);
@@ -137,41 +184,49 @@ function showCustomerNotice(message, success = false) {
   notice.scrollIntoView({ behavior: "smooth", block: "start" });
   customerNoticeTimer = setTimeout(() => notice.classList.add("hidden"), 8000);
 }
-document.querySelector("#customer-logout").addEventListener("click", () => {
+document.querySelector("#customer-logout")?.addEventListener("click", () => {
   sessionStorage.removeItem("trimtimeCustomerToken");
   sessionStorage.removeItem("trimtimeScannedShopId");
   sessionStorage.removeItem("trimtimeActiveShopId");
   customerToken = null;
   location.href = "/customer";
 });
-document.querySelector("#show-customer-profile").addEventListener("click", async () => {
-  const panel = document.querySelector("#customer-profile-panel"); panel.classList.toggle("hidden");
+document.querySelector("#show-customer-profile")?.addEventListener("click", async () => {
+  const panel = document.querySelector("#customer-profile-panel");
+  if (!panel) return;
+  panel.classList.toggle("hidden");
   if (!panel.classList.contains("hidden")) { await loadCustomerHistory(); panel.scrollIntoView({ behavior: "smooth", block: "start" }); }
 });
 document.querySelectorAll("[data-profile-tab]").forEach((button) => button.addEventListener("click", async () => {
   const target = button.dataset.profileTab;
   document.querySelectorAll("[data-profile-tab]").forEach((item) => item.classList.toggle("active", item === button));
-  document.querySelector("#customer-details-tab").classList.toggle("hidden", target !== "details");
-  document.querySelector("#customer-history-tab").classList.toggle("hidden", target !== "history");
+  document.querySelector("#customer-details-tab")?.classList.toggle("hidden", target !== "details");
+  document.querySelector("#customer-history-tab")?.classList.toggle("hidden", target !== "history");
   if (target === "history") await loadCustomerHistory();
 }));
 const customerDetailsTab = document.querySelector("#customer-details-tab");
-customerDetailsTab.insertAdjacentHTML("afterbegin", '<div class="section-heading"><h3>Your details</h3><button id="edit-customer-details" type="button" class="secondary">Edit details</button></div>');
-customerDetailsTab.insertAdjacentHTML("beforeend", '<form id="customer-details-form" class="single-column-form hidden"><label>Name<input id="edit-customer-name" minlength="2" maxlength="100" autocomplete="name" required /></label><label>Age<input id="edit-customer-age" type="number" min="5" max="110" required /></label><label>Gender<select id="edit-customer-gender" required><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><p class="muted small-note">Your verified email and mobile number cannot be changed here.</p><div class="actions"><button type="submit">Save changes</button><button id="cancel-customer-details" type="button" class="ghost">Cancel</button></div><p id="customer-details-result" class="success" aria-live="polite"></p></form>');
+if (customerDetailsTab) {
+  customerDetailsTab.insertAdjacentHTML("afterbegin", '<div class="section-heading"><h3>Your details</h3><button id="edit-customer-details" type="button" class="secondary">Edit details</button></div>');
+  customerDetailsTab.insertAdjacentHTML("beforeend", '<form id="customer-details-form" class="single-column-form hidden"><label>Name<input id="edit-customer-name" minlength="2" maxlength="100" autocomplete="name" required /></label><label>Age<input id="edit-customer-age" type="number" min="5" max="110" required /></label><label>Gender<select id="edit-customer-gender" required><option value="male">Male</option><option value="female">Female</option><option value="non_binary">Non-binary</option><option value="prefer_not_to_say">Prefer not to say</option></select></label><p class="muted small-note">Your verified email and mobile number cannot be changed here.</p><div class="actions"><button type="submit">Save changes</button><button id="cancel-customer-details" type="button" class="ghost">Cancel</button></div><p id="customer-details-result" class="success" aria-live="polite"></p></form>');
+}
 function setCustomerDetailsEdit(open) {
-  document.querySelector(".profile-details").classList.toggle("hidden", open);
-  document.querySelector("#customer-details-form").classList.toggle("hidden", !open);
-  document.querySelector("#edit-customer-details").classList.toggle("hidden", open);
+  document.querySelector(".profile-details")?.classList.toggle("hidden", open);
+  document.querySelector("#customer-details-form")?.classList.toggle("hidden", !open);
+  document.querySelector("#edit-customer-details")?.classList.toggle("hidden", open);
   if (open && currentCustomer) {
-    document.querySelector("#edit-customer-name").value = currentCustomer.name || "";
-    document.querySelector("#edit-customer-age").value = currentCustomer.age || "";
-    document.querySelector("#edit-customer-gender").value = currentCustomer.gender || "prefer_not_to_say";
-    document.querySelector("#customer-details-result").textContent = "";
+    const editName = document.querySelector("#edit-customer-name");
+    if (editName) editName.value = currentCustomer.name || "";
+    const editAge = document.querySelector("#edit-customer-age");
+    if (editAge) editAge.value = currentCustomer.age || "";
+    const editGender = document.querySelector("#edit-customer-gender");
+    if (editGender) editGender.value = currentCustomer.gender || "prefer_not_to_say";
+    const editRes = document.querySelector("#customer-details-result");
+    if (editRes) editRes.textContent = "";
   }
 }
-document.querySelector("#edit-customer-details").addEventListener("click", () => setCustomerDetailsEdit(true));
-document.querySelector("#cancel-customer-details").addEventListener("click", () => setCustomerDetailsEdit(false));
-document.querySelector("#customer-details-form").addEventListener("submit", async (event) => {
+document.querySelector("#edit-customer-details")?.addEventListener("click", () => setCustomerDetailsEdit(true));
+document.querySelector("#cancel-customer-details")?.addEventListener("click", () => setCustomerDetailsEdit(false));
+document.querySelector("#customer-details-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const result = document.querySelector("#customer-details-result"); result.textContent = "";
   try {
@@ -240,8 +295,8 @@ function openHistoryRating(type, token, label) {
   document.querySelector("#history-rating-result").textContent = "";
   panel.classList.remove("hidden"); panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
-document.querySelector("#close-history-rating").addEventListener("click", () => document.querySelector("#history-rating-panel").classList.add("hidden"));
-document.querySelector("#history-rating-form").addEventListener("submit", async (event) => {
+document.querySelector("#close-history-rating")?.addEventListener("click", () => document.querySelector("#history-rating-panel")?.classList.add("hidden"));
+document.querySelector("#history-rating-form")?.addEventListener("submit", async (event) => {
   event.preventDefault(); const result = document.querySelector("#history-rating-result"), barberStars = Number(document.querySelector("#history-barber-rating").value);
   if (!historyRatingTarget) return;
   if (!document.querySelector("#history-shop-rating").value) { result.textContent = "Select a shop rating from 1 to 5 stars, or close this optional feedback form."; return; }
@@ -266,7 +321,7 @@ async function restoreCustomerSession() {
 
   // Device-level fast MPIN login if customer previously logged in on this device
   const savedEmail = localStorage.getItem("trimtimeCustomerEmail");
-  if (savedEmail && customerDeviceId && customerAuthMode !== "signup") {
+  if (savedEmail && customerDeviceId && currentCustomerAuthMode !== "signup") {
     try {
       const check = await fetch("/api/customer-auth/check-device", {
         method: "POST",
@@ -294,23 +349,33 @@ async function requestOtp(identifier, resetMpin = false) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(formatApiError(body.detail));
   firstTimeCustomer = body.first_time;
-  if (currentCustomerAuthMode === "signin" && firstTimeCustomer) {
-    setCustomerAuthMode("signup");
-  } else if (currentCustomerAuthMode === "signup" && !firstTimeCustomer) {
-    setCustomerAuthMode("signin");
-  }
   pendingIdentifier = cleanEmail;
-  document.querySelector("#otp-request-step").classList.add("hidden");
-  document.querySelector("#otp-verify-step").classList.remove("hidden");
-  document.querySelector("#otp-message").textContent = body.message || `Verification code sent to ${cleanEmail}. Check your inbox.`;
+
+  ["#otp-request-step", "#customer-signup-step", "#customer-mpin-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+  document.querySelector("#otp-verify-step")?.classList.remove("hidden");
+
+  let msg = body.message || `Verification code sent to ${cleanEmail}. Check your inbox.`;
+  const devBanner = document.querySelector("#otp-dev-helper");
+  if (body.development_otp && devBanner) {
+    devBanner.textContent = `Development OTP code: ${body.development_otp}`;
+    devBanner.classList.remove("hidden");
+    const otpInput = document.querySelector("#customer-otp");
+    if (otpInput) otpInput.value = body.development_otp;
+  } else if (devBanner) {
+    devBanner.classList.add("hidden");
+  }
+  const otpMsg = document.querySelector("#otp-message");
+  if (otpMsg) otpMsg.textContent = msg;
   const statusEl = document.querySelector("#customer-auth-status");
   if (statusEl) statusEl.textContent = "Verification code has been dispatched to your email.";
+  const otpInput = document.querySelector("#customer-otp");
+  if (otpInput) otpInput.focus();
 }
 
 function showCustomerMpin(mode, accountName = null) {
   customerMpinMode = mode;
-  ["#otp-request-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id).classList.add("hidden"));
-  document.querySelector("#customer-mpin-step").classList.remove("hidden");
+  ["#otp-request-step", "#customer-signup-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+  document.querySelector("#customer-mpin-step")?.classList.remove("hidden");
   const enteringExisting = mode === "login" || mode === "verify", needsConfirm = mode === "setup";
   const titleEl = document.querySelector("#customer-mpin-title");
   if (titleEl) {
@@ -334,10 +399,12 @@ function showCustomerMpin(mode, accountName = null) {
       banner.classList.add("hidden");
     }
   }
-  document.querySelector("#customer-confirm-mpin-label").classList.toggle("hidden", !needsConfirm);
-  document.querySelector("#customer-confirm-mpin").required = needsConfirm;
-  document.querySelector("#customer-mpin-submit").textContent = enteringExisting ? "Sign in →" : "Save MPIN and continue →";
-  document.querySelector("#forgot-customer-mpin").classList.toggle("hidden", !enteringExisting);
+  document.querySelector("#customer-confirm-mpin-label")?.classList.toggle("hidden", !needsConfirm);
+  const confirmInput = document.querySelector("#customer-confirm-mpin");
+  if (confirmInput) confirmInput.required = needsConfirm;
+  const submitBtn = document.querySelector("#customer-mpin-submit");
+  if (submitBtn) submitBtn.textContent = enteringExisting ? "Sign in →" : "Save MPIN and continue →";
+  document.querySelector("#forgot-customer-mpin")?.classList.toggle("hidden", !enteringExisting);
 }
 
 const switchAccountBtn = document.querySelector("#switch-account-btn");
@@ -345,8 +412,7 @@ if (switchAccountBtn) {
   switchAccountBtn.addEventListener("click", () => {
     localStorage.removeItem("trimtimeCustomerEmail");
     pendingIdentifier = "";
-    document.querySelector("#customer-mpin-step").classList.add("hidden");
-    document.querySelector("#otp-request-step").classList.remove("hidden");
+    showOtpRequestSignIn();
     const identInput = document.querySelector("#customer-identifier");
     if (identInput) {
       identInput.value = "";
@@ -355,34 +421,81 @@ if (switchAccountBtn) {
   });
 }
 
-document.querySelector("#otp-request-form").addEventListener("submit", async (event) => {
+document.querySelector("#otp-request-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
-  authError.textContent = "";
-  pendingIdentifier = document.querySelector("#customer-identifier").value.trim().toLowerCase();
+  if (authError) authError.textContent = "";
+  pendingIdentifier = document.querySelector("#customer-identifier")?.value.trim().toLowerCase() || "";
+  if (!pendingIdentifier) return;
+  pendingSignupProfile = null;
   try {
-    const check = await fetch("/api/customer-auth/check-device", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ identifier: pendingIdentifier, device_id: customerDeviceId })
-    }).then((r) => r.json());
-    if (check.mpin_login && customerAuthMode !== "signup") {
-      showCustomerMpin("login", check.name || null);
-    } else {
-      await requestOtp(pendingIdentifier);
+    if (currentCustomerAuthMode === "signin") {
+      const check = await fetch("/api/customer-auth/check-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: pendingIdentifier, device_id: customerDeviceId })
+      }).then((r) => r.json()).catch(() => ({}));
+      if (check.mpin_login) {
+        showCustomerMpin("login", check.name || null);
+        return;
+      }
     }
+    await requestOtp(pendingIdentifier);
   } catch (reason) {
-    authError.textContent = reason.message;
+    if (authError) authError.textContent = reason.message;
   }
 });
 
-document.querySelector("#resend-customer-otp").addEventListener("click", async () => {
+document.querySelector("#customer-signup-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
-  authError.textContent = "";
+  if (authError) authError.textContent = "";
+  const statusEl = document.querySelector("#customer-auth-status");
+  if (statusEl) statusEl.textContent = "";
+
+  const name = document.querySelector("#signup-name")?.value.trim();
+  const email = document.querySelector("#signup-email")?.value.trim().toLowerCase();
+  const age = Number(document.querySelector("#signup-age")?.value);
+  const gender = document.querySelector("#signup-gender")?.value;
+  const phone = document.querySelector("#signup-phone")?.value.trim() || null;
+  const mpin = document.querySelector("#signup-mpin")?.value.trim() || null;
+  const termsAccepted = document.querySelector("#signup-terms")?.checked;
+
+  if (!name || !email || !age || !gender || !termsAccepted) {
+    if (authError) authError.textContent = "Please fill in all required fields and accept the Terms & Conditions.";
+    return;
+  }
+  if (mpin && !/^[0-9]{6}$/.test(mpin)) {
+    if (authError) authError.textContent = "MPIN must be exactly 6 digits.";
+    return;
+  }
+
+  pendingSignupProfile = { name, email, age, gender, phone, mpin, terms_accepted: true };
+  pendingIdentifier = email;
+
+  try {
+    await requestOtp(email);
+  } catch (reason) {
+    if (authError) authError.textContent = reason.message;
+  }
+});
+
+document.querySelector("#resend-customer-otp")?.addEventListener("click", async () => {
+  const authError = document.querySelector("#customer-auth-error");
+  if (authError) authError.textContent = "";
   try {
     await requestOtp(pendingIdentifier);
   } catch (reason) {
-    authError.textContent = reason.message;
+    if (authError) authError.textContent = reason.message;
+  }
+});
+
+document.querySelector("#otp-back-btn")?.addEventListener("click", () => {
+  document.querySelector("#otp-verify-step")?.classList.add("hidden");
+  if (currentCustomerAuthMode === "signup") {
+    document.querySelector("#customer-signup-step")?.classList.remove("hidden");
+  } else {
+    document.querySelector("#otp-request-step")?.classList.remove("hidden");
   }
 });
 
@@ -390,57 +503,83 @@ async function completeOtpVerification(profile = {}) {
   const response = await fetch("/api/customer-auth/verify-otp", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identifier: pendingIdentifier, otp: pendingOtp, reset_mpin: resetCustomerMpin, ...profile })
+    body: JSON.stringify({
+      identifier: pendingIdentifier,
+      otp: pendingOtp,
+      reset_mpin: resetCustomerMpin,
+      device_id: customerDeviceId,
+      device_name: navigator.userAgent.slice(0, 160),
+      ...profile
+    })
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(formatApiError(body.detail));
+  if (body.access_token) {
+    customerToken = body.access_token;
+    sessionStorage.setItem("trimtimeCustomerToken", customerToken);
+    localStorage.setItem("trimtimeCustomerEmail", pendingIdentifier);
+    pendingSignupProfile = null;
+    showCustomerApp(body.customer);
+    return;
+  }
   customerMpinVerification = body.verification_token;
   showCustomerMpin(body.requires_mpin_setup ? "setup" : "verify", body.customer ? body.customer.name : null);
 }
 
-document.querySelector("#otp-verify-form").addEventListener("submit", async (event) => {
+document.querySelector("#otp-verify-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
-  authError.textContent = "";
-  pendingOtp = document.querySelector("#customer-otp").value.trim();
+  if (authError) authError.textContent = "";
+  pendingOtp = document.querySelector("#customer-otp")?.value.trim();
   try {
-    if (firstTimeCustomer) {
-      document.querySelector("#otp-verify-step").classList.add("hidden");
-      document.querySelector("#customer-profile-step").classList.remove("hidden");
+    if (pendingSignupProfile) {
+      await completeOtpVerification({
+        name: pendingSignupProfile.name,
+        age: pendingSignupProfile.age,
+        gender: pendingSignupProfile.gender,
+        phone: pendingSignupProfile.phone,
+        mpin: pendingSignupProfile.mpin,
+        terms_accepted: true
+      });
+    } else if (firstTimeCustomer) {
+      document.querySelector("#otp-verify-step")?.classList.add("hidden");
+      document.querySelector("#customer-profile-step")?.classList.remove("hidden");
+      const nameInput = document.querySelector("#verified-customer-name");
+      if (nameInput) nameInput.focus();
     } else {
       await completeOtpVerification();
     }
   } catch (reason) {
-    authError.textContent = reason.message || "Invalid OTP code";
+    if (authError) authError.textContent = reason.message || "Invalid OTP code";
   }
 });
 
-document.querySelector("#customer-profile-form").addEventListener("submit", async (event) => {
+document.querySelector("#customer-profile-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
-  authError.textContent = "";
+  if (authError) authError.textContent = "";
   try {
     await completeOtpVerification({
-      name: document.querySelector("#verified-customer-name").value.trim(),
-      age: Number(document.querySelector("#verified-customer-age").value),
-      gender: document.querySelector("#verified-customer-gender").value,
-      terms_accepted: document.querySelector("#customer-terms").checked
+      name: document.querySelector("#verified-customer-name")?.value.trim(),
+      age: Number(document.querySelector("#verified-customer-age")?.value),
+      gender: document.querySelector("#verified-customer-gender")?.value,
+      terms_accepted: document.querySelector("#customer-terms")?.checked
     });
   } catch (reason) {
-    authError.textContent = reason.message;
+    if (authError) authError.textContent = reason.message;
   }
 });
 
-document.querySelector("#customer-mpin-form").addEventListener("submit", async (event) => {
+document.querySelector("#customer-mpin-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
-  authError.textContent = "";
-  const mpin = document.querySelector("#customer-mpin").value;
+  if (authError) authError.textContent = "";
+  const mpin = document.querySelector("#customer-mpin")?.value;
   try {
     const path = customerMpinMode === "login" ? "/api/customer-auth/login-mpin" : "/api/customer-auth/complete-mpin";
     const payload = customerMpinMode === "login"
       ? { identifier: pendingIdentifier, mpin, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) }
-      : { verification_token: customerMpinVerification, mpin, confirm_mpin: document.querySelector("#customer-confirm-mpin").value || null, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) };
+      : { verification_token: customerMpinVerification, mpin, confirm_mpin: document.querySelector("#customer-confirm-mpin")?.value || null, device_id: customerDeviceId, device_name: navigator.userAgent.slice(0, 160) };
     const response = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -453,18 +592,17 @@ document.querySelector("#customer-mpin-form").addEventListener("submit", async (
     localStorage.setItem("trimtimeCustomerEmail", pendingIdentifier);
     showCustomerApp(body.customer);
   } catch (reason) {
-    authError.textContent = reason.message;
+    if (authError) authError.textContent = reason.message;
   }
 });
 
-document.querySelector("#forgot-customer-mpin").addEventListener("click", async () => {
+document.querySelector("#forgot-customer-mpin")?.addEventListener("click", async () => {
   const authError = document.querySelector("#customer-auth-error");
-  authError.textContent = "";
-  try {
-    document.querySelector("#customer-mpin-step").classList.add("hidden");
-    await requestOtp(pendingIdentifier, true);
-  } catch (reason) {
-    authError.textContent = reason.message;
+  if (authError) authError.textContent = "";
+  showOtpRequestSignIn();
+  const identInput = document.querySelector("#customer-identifier");
+  if (identInput && pendingIdentifier) {
+    identInput.value = pendingIdentifier;
   }
 });
 fetch("/api/platform/banner").then((response) => response.json()).then((banner) => { document.querySelectorAll(".brand-name").forEach((item) => item.textContent = banner.software_name); if (banner.login_image_url) { document.querySelector("#customer-auth-image").style.backgroundImage = `linear-gradient(135deg,#173c35cc,#245c5277),url("${banner.login_image_url}")`; document.querySelector("#customer-profile-ad").style.backgroundImage = `url("${banner.login_image_url}")`; } }).catch(() => {});
@@ -482,7 +620,14 @@ function updateAppointmentServiceLabel() {
 }
 function renderAppointmentServiceOptions(services) {
   const options = document.querySelector("#appointment-service-options");
-  options.innerHTML = services.map((service) => `<label><span>${escapeHtml(service.name)} <small>₹${service.price_rupees}</small></span><input type="checkbox" value="${service.id}" data-service-name="${escapeHtml(service.name)}" data-appointment-service /></label>`).join("");
+  if (!options) return;
+  options.innerHTML = services.map((service) => `
+    <label class="service-checkbox-item">
+      <input type="checkbox" value="${service.id}" data-service-name="${escapeHtml(service.name)}" data-appointment-service />
+      <span class="service-option-name">${escapeHtml(service.name)}</span>
+      <span class="service-option-badge">${service.duration_minutes} min · ₹${service.price_rupees}</span>
+    </label>
+  `).join("");
   updateAppointmentServiceLabel();
 }
 function escapeHtml(value) { const node = document.createElement("span"); node.textContent = value ?? ""; return node.innerHTML; }
@@ -625,13 +770,13 @@ function renderShopCards(shops, showAll = false) {
     const bookButtonHtml = item.appointments_enabled !== false
       ? `<button type="button" data-book-shop="${item.id}" class="secondary">Book appointment</button>`
       : "";
-    return `<article class="shop-market-card clickable-shop-card" data-shop-id="${item.id}" tabindex="0" role="button" aria-label="View ${escapeHtml(item.name)} details">${item.photo_url ? `<img src="${item.photo_url}" alt="${escapeHtml(item.name)}" />` : '<div class="shop-card-placeholder">TRIMTIME</div>'}<div class="shop-market-content"><div class="shop-card-header"><h3>${escapeHtml(item.name)}</h3><span class="view-details-pill">View shop ›</span></div><p class="shop-rating-summary">${ratingSummary(item)}</p><p>${escapeHtml(item.address)}</p><small>${item.opens_at}–${item.closes_at} · ${item.waiting_count} waiting · ${item.estimated_wait_minutes} estimated minutes</small><p class="card-services">${(item.services || []).slice(0, 3).map((service) => `${escapeHtml(service.name)} ₹${service.price_rupees}`).join(" · ")}</p><div class="actions"><button type="button" class="view-shop-btn" data-view-shop="${item.id}">View shop details</button><button type="button" data-open-shop="${item.id}">Join live queue</button>${bookButtonHtml}<a href="https://www.google.com/maps/dir/?api=1&destination=${dest}" target="_blank" rel="noopener" class="card-direction-btn" title="Navigate with Google Maps" onclick="event.stopPropagation()">🧭 Directions</a></div></div></article>`;
+    return `<article class="shop-market-card clickable-shop-card" data-shop-id="${item.id}" tabindex="0" role="button" aria-label="View ${escapeHtml(item.name)} details">${item.photo_url ? `<img src="${item.photo_url}" alt="${escapeHtml(item.name)}" />` : '<div class="shop-card-placeholder">TRIMTIME</div>'}<div class="shop-market-content"><div class="shop-card-header"><h3>${escapeHtml(item.name)}</h3><span class="view-details-pill">View shop ›</span></div><p class="shop-rating-summary">${ratingSummary(item)}</p><p>${escapeHtml(item.address)}</p><small>${item.opens_at}–${item.closes_at} · ${item.waiting_count} waiting · ${item.estimated_wait_minutes} estimated minutes</small><p class="card-services">${(item.services || []).slice(0, 3).map((service) => `${escapeHtml(service.name)} ₹${service.price_rupees}`).join(" · ")}</p><div class="actions"><button type="button" data-open-shop="${item.id}">Join live queue</button>${bookButtonHtml}<a href="https://www.google.com/maps/dir/?api=1&destination=${dest}" target="_blank" rel="noopener" class="card-direction-btn" title="Navigate with Google Maps" onclick="event.stopPropagation()">🧭 Directions</a></div></div></article>`;
   }).join("");
 
   cards.querySelectorAll(".clickable-shop-card").forEach((card) => {
     const targetShopId = Number(card.dataset.shopId);
     card.addEventListener("click", async (event) => {
-      if (event.target.closest("[data-open-shop],[data-book-shop],[data-view-shop],.card-direction-btn")) return;
+      if (event.target.closest("[data-open-shop],[data-book-shop],.card-direction-btn")) return;
       await selectAndShowShop(targetShopId);
     });
     card.addEventListener("keydown", async (event) => {
@@ -639,13 +784,6 @@ function renderShopCards(shops, showAll = false) {
         event.preventDefault();
         await selectAndShowShop(targetShopId);
       }
-    });
-  });
-
-  cards.querySelectorAll("[data-view-shop]").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await selectAndShowShop(Number(button.dataset.viewShop));
     });
   });
 
@@ -734,18 +872,26 @@ async function loadShop() {
     const apptPanel = document.querySelector("#appointment-panel");
     if (apptPanel) apptPanel.classList.add("hidden");
   }
-  if (activeAppointmentDetails && activeAppointmentDetails.shop_id === shopId) {
-    showAppointment(activeAppointmentDetails);
+  if (activeAppointments && activeAppointments.length > 0) {
+    renderAppointmentsList(activeAppointments);
+  } else if (activeAppointmentDetails) {
+    renderAppointmentsList([activeAppointmentDetails]);
   } else {
     const apptTicket = document.querySelector("#appointment-ticket-panel");
     if (apptTicket) apptTicket.classList.add("hidden");
+  }
+  if (activeQueueEntries && activeQueueEntries.length > 0) {
+    renderQueueTicketsList(activeQueueEntries);
+  } else {
+    const ticketPanel = document.querySelector("#ticket-panel");
+    if (ticketPanel) ticketPanel.classList.add("hidden");
   }
   renderShopCards(allShops);
   updateScannedShopBadge();
   connectRealtime();
 }
 
-document.querySelector("#shop").addEventListener("change", async (event) => {
+document.querySelector("#shop")?.addEventListener("change", async (event) => {
   await selectAndShowShop(Number(event.target.value));
 });
 
@@ -846,7 +992,7 @@ function joinCurrentShop() {
   openJoinQueuePanel();
 }
 
-document.querySelector("#show-join-options").addEventListener("click", () => {
+document.querySelector("#show-join-options")?.addEventListener("click", () => {
   openJoinQueuePanel();
 });
 
@@ -857,9 +1003,9 @@ if (closeJoinBtn) {
   });
 }
 
-document.querySelector("#show-appointment-options").addEventListener("click", () => {
+document.querySelector("#show-appointment-options")?.addEventListener("click", () => {
   const appointmentPanel = document.querySelector("#appointment-panel");
-  appointmentPanel.classList.remove("hidden");
+  if (appointmentPanel) appointmentPanel.classList.remove("hidden");
   joinPanel.classList.add("hidden");
   appointmentPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 });
@@ -1155,13 +1301,13 @@ if (clearSlotBtn) {
     });
   });
 }
-document.querySelector("#appointment-service-toggle").addEventListener("click", () => { const options = document.querySelector("#appointment-service-options"), opening = options.classList.contains("hidden"); options.classList.toggle("hidden"); document.querySelector("#appointment-service-toggle").setAttribute("aria-expanded", String(opening)); });
-document.querySelector("#appointment-service-options").addEventListener("change", () => { updateAppointmentServiceLabel(); loadAppointmentSlots(); });
-document.addEventListener("click", (event) => { if (!event.target.closest("#appointment-service-picker")) { document.querySelector("#appointment-service-options").classList.add("hidden"); document.querySelector("#appointment-service-toggle").setAttribute("aria-expanded", "false"); } });
-document.querySelector("#appointment-barber").addEventListener("change", loadAppointmentSlots);
-document.querySelector("#appointment-date").addEventListener("change", loadAppointmentSlots);
+document.querySelector("#appointment-service-toggle")?.addEventListener("click", () => { const options = document.querySelector("#appointment-service-options"), opening = options && options.classList.contains("hidden"); if (options) options.classList.toggle("hidden"); document.querySelector("#appointment-service-toggle")?.setAttribute("aria-expanded", String(opening)); });
+document.querySelector("#appointment-service-options")?.addEventListener("change", () => { updateAppointmentServiceLabel(); loadAppointmentSlots(); });
+document.addEventListener("click", (event) => { if (!event.target.closest("#appointment-service-picker")) { document.querySelector("#appointment-service-options")?.classList.add("hidden"); document.querySelector("#appointment-service-toggle")?.setAttribute("aria-expanded", "false"); } });
+document.querySelector("#appointment-barber")?.addEventListener("change", loadAppointmentSlots);
+document.querySelector("#appointment-date")?.addEventListener("change", loadAppointmentSlots);
 
-document.querySelector("#nearby-shops").addEventListener("click", () => {
+document.querySelector("#nearby-shops")?.addEventListener("click", () => {
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(async ({ coords }) => {
     const shops = await api(`/api/marketplace/nearby?latitude=${coords.latitude}&longitude=${coords.longitude}&radius_km=25`);
@@ -1217,108 +1363,140 @@ async function sendAlert(entry) {
   if (entry.status === "serving") new Notification("TrimTime", { body: "Your barber is ready." });
 }
 
+function renderQueueTicketsList(entries) {
+  const panel = document.querySelector("#ticket-panel");
+  const container = document.querySelector("#queue-tickets-container");
+  if (!panel) return;
+
+  if (!entries || !entries.length) {
+    if (container) container.innerHTML = "";
+    panel.classList.add("hidden");
+    hideOtherShopTicketBanner();
+    return;
+  }
+
+  const currentEntries = shopId ? entries.filter((e) => e.shop_id === shopId) : entries;
+  const otherEntries = shopId ? entries.filter((e) => e.shop_id !== shopId) : [];
+
+  if (otherEntries.length > 0 && currentEntries.length === 0) {
+    panel.classList.add("hidden");
+    showOtherShopTicketBanner(otherEntries[0]);
+    return;
+  } else {
+    hideOtherShopTicketBanner();
+  }
+
+  if (currentEntries.length === 0) {
+    if (container) container.innerHTML = "";
+    panel.classList.add("hidden");
+    return;
+  }
+
+  panel.classList.remove("hidden");
+  joinPanel.classList.add("hidden");
+
+  if (container) {
+    container.innerHTML = currentEntries.map((entry) => {
+      const isServing = entry.status === "serving";
+      const statusLabel = entry.availability_message || (isServing ? "In Chair" : entry.status);
+      return `
+        <div class="panel ticket queue-ticket-card" data-token="${entry.public_token}">
+          <p class="eyebrow">YOUR LIVE TICKET</p>
+          <div class="ticket-head">
+            <h2>${escapeHtml(entry.token)}</h2>
+            <span>${escapeHtml(statusLabel)}</span>
+          </div>
+          <div class="ticket-grid">
+            <div><strong>${entry.people_ahead ?? "—"}</strong><span>${escapeHtml(entry.ahead_label || "people ahead")}</span></div>
+            <div><strong class="entry-live-wait" data-base-wait="${entry.estimated_wait_minutes}">${entry.estimated_wait_minutes}</strong><span>minutes estimated</span></div>
+          </div>
+          <p>Service: <strong>${escapeHtml(entry.service_name || "Haircut")}</strong></p>
+          <p>Barber: <strong>${escapeHtml(entry.barber_name || "First available barber")}</strong></p>
+          <div class="ticket-actions">
+            <button class="secondary leave-single-queue-btn" type="button" data-public-token="${entry.public_token}">Leave queue</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    container.querySelectorAll(".leave-single-queue-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const tokenToLeave = btn.dataset.publicToken;
+        if (!tokenToLeave || !confirm("Leave queue for this ticket?")) return;
+        try {
+          btn.disabled = true;
+          btn.textContent = "Leaving…";
+          await api("/api/my-queue/cancel", {
+            method: "POST",
+            body: JSON.stringify({ public_token: tokenToLeave })
+          });
+          if (activeToken === tokenToLeave) {
+            localStorage.removeItem("trimtimeQueueToken");
+            activeToken = null;
+          }
+          await restoreActiveQueues();
+          await loadShop();
+        } catch (reason) {
+          showCustomerNotice(reason.message);
+          btn.disabled = false;
+          btn.textContent = "Leave queue";
+        }
+      });
+    });
+  }
+
+  if (currentEntries.some((e) => e.status === "waiting")) {
+    startLiveWaitCountdown(currentEntries[0]);
+  }
+}
+
 function showTicket(entry) {
   if (!entry) return;
   sendAlert(entry);
-  lastPeopleAhead = entry.people_ahead;
-  const completed = entry.status === "completed", cancelled = entry.status === "cancelled";
-  if (cancelled) {
-    localStorage.removeItem("trimtimeQueueToken");
-    activeToken = null;
-    currentQueueEntry = null;
-    hideOtherShopTicketBanner();
-  }
-
-  if (completed || cancelled) {
-    if (liveWaitTimer) clearInterval(liveWaitTimer);
-    liveWaitTimer = null;
-    currentQueueEntry = null;
-  } else {
-    currentQueueEntry = entry;
-  }
-
-  if (!shopId) {
-    ticketPanel.classList.add("hidden");
-    hideOtherShopTicketBanner();
-    return;
-  }
-
-  if (entry.shop_id !== shopId) {
-    ticketPanel.classList.add("hidden");
-    if (!completed && !cancelled) {
-      showOtherShopTicketBanner(entry);
-    } else {
-      hideOtherShopTicketBanner();
-    }
-    return;
-  }
-
-  hideOtherShopTicketBanner();
-  joinPanel.classList.add("hidden");
-  ticketPanel.classList.remove("hidden");
-  document.querySelector("#ticket-token").textContent = entry.token;
-  document.querySelector("#ticket-status").textContent = entry.status;
-  document.querySelector("#people-ahead").textContent = entry.people_ahead ?? "—";
-  document.querySelector("#ahead-label").textContent = entry.ahead_label || "people ahead";
-  document.querySelector("#ticket-wait").textContent = entry.estimated_wait_minutes;
-  document.querySelector("#ticket-barber").textContent = entry.barber_name || "First available barber";
-  document.querySelector("#ticket-status").textContent = entry.availability_message || entry.status;
-  document.querySelector("#notify").classList.toggle("hidden", completed || cancelled);
-  document.querySelector("#leave-queue").classList.toggle("hidden", completed || cancelled);
-  document.querySelector("#rating-form").classList.toggle("hidden", !completed);
-
-  if (!completed && !cancelled && entry.status === "waiting") {
-    startLiveWaitCountdown(entry);
-  }
-}
-
-async function refreshTicket() {
-  if (!activeToken) {
-    hideOtherShopTicketBanner();
-    return;
-  }
-  try {
-    const entry = await api(`/api/my-queue/${activeToken}`);
-    showTicket(entry);
-  } catch {
-    localStorage.removeItem("trimtimeQueueToken");
-    activeToken = null;
-    hideOtherShopTicketBanner();
-  }
-}
-
-async function restoreActiveQueue() {
-  let entry = null;
-  try {
-    entry = await api("/api/customer-auth/active-queue");
-  } catch {
-    entry = null;
-  }
-  if (!entry) {
-    if (activeToken) await refreshTicket();
-    else hideOtherShopTicketBanner();
-    return;
-  }
   activeToken = entry.public_token;
   localStorage.setItem("trimtimeQueueToken", activeToken);
-
-  if (entry.shop_id === shopId) {
-    hideOtherShopTicketBanner();
-    showTicket(entry);
-    const appointmentPanel = document.querySelector("#appointment-panel");
-    const isApptOpen = appointmentPanel && !appointmentPanel.classList.contains("hidden");
-    if (!isApptOpen) {
-      ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+  const existingIdx = activeQueueEntries.findIndex((e) => e.public_token === entry.public_token);
+  if (existingIdx >= 0) {
+    activeQueueEntries[existingIdx] = entry;
   } else {
-    ticketPanel.classList.add("hidden");
-    if (shopId) {
-      showOtherShopTicketBanner(entry);
-    } else {
-      hideOtherShopTicketBanner();
+    activeQueueEntries.unshift(entry);
+  }
+  renderQueueTicketsList(activeQueueEntries);
+}
+
+async function restoreActiveQueues() {
+  let list = [];
+  if (customerToken) {
+    try {
+      list = await api("/api/customer-auth/active-queues");
+    } catch {
+      list = [];
     }
   }
+  if (!list.length && activeToken) {
+    try {
+      const single = await api(`/api/my-queue/${activeToken}`);
+      if (single && ["waiting", "serving"].includes(single.status)) {
+        list = [single];
+      }
+    } catch {
+      localStorage.removeItem("trimtimeQueueToken");
+      activeToken = null;
+    }
+  }
+  activeQueueEntries = list;
+  if (list.length > 0) {
+    activeToken = list[0].public_token;
+    localStorage.setItem("trimtimeQueueToken", activeToken);
+  } else {
+    activeToken = null;
+    localStorage.removeItem("trimtimeQueueToken");
+  }
+  renderQueueTicketsList(list);
 }
+
+const restoreActiveQueue = restoreActiveQueues;
+const refreshTicket = restoreActiveQueues;
 
 function urlBase64ToUint8Array(value) {
   const padding = "=".repeat((4 - value.length % 4) % 4);
@@ -1326,7 +1504,7 @@ function urlBase64ToUint8Array(value) {
   return Uint8Array.from([...raw].map((character) => character.charCodeAt(0)));
 }
 
-document.querySelector("#notify").addEventListener("click", async () => {
+document.querySelector("#notify")?.addEventListener("click", async () => {
   if (!activeToken || !("Notification" in window) || !("serviceWorker" in navigator)) return;
   if (await Notification.requestPermission() !== "granted") return;
   const { public_key: publicKey } = await api("/api/push/public-key");
@@ -1342,7 +1520,7 @@ async function handleJoinQueueSubmit(event) {
   const error = document.querySelector("#form-error");
   if (error) error.textContent = "";
 
-  const customerName = document.querySelector("#customer-name")?.value.trim();
+  const customerName = document.querySelector("#customer-name")?.value.trim() || currentCustomer?.name || "Customer";
   if (!customerName) {
     if (error) error.textContent = "Please enter your name.";
     return;
@@ -1392,21 +1570,22 @@ async function handleJoinQueueSubmit(event) {
     localStorage.setItem("trimtimeQueueToken", activeToken);
     joinPanel.classList.add("hidden");
     showTicket(entry);
+    await restoreActiveQueues();
     await loadShop();
     ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (message) {
     if (error) error.textContent = message.message;
     showCustomerNotice(message.message);
-    if (message.message && (message.message.includes("active ticket") || message.message.includes("already have an active"))) {
+    if (message.message && (message.message.includes("active ticket") || message.message.includes("already have"))) {
       joinPanel.classList.add("hidden");
       await loadShop();
-      if (activeToken) await refreshTicket();
+      await restoreActiveQueues();
       ticketPanel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = "Confirm & Join Live Queue <span>→</span>";
+      submitBtn.innerHTML = "Add to Join Live Queue <span>→</span>";
     }
   }
 }
@@ -1436,7 +1615,7 @@ if (targetSelfBtn && targetOtherBtn) {
   });
 }
 
-document.querySelector("#book-appointment").addEventListener("click", async () => {
+document.querySelector("#book-appointment")?.addEventListener("click", async () => {
   const result = document.querySelector("#appointment-result");
   result.innerHTML = "";
   try {
@@ -1486,8 +1665,10 @@ document.querySelector("#book-appointment").addEventListener("click", async () =
 
     activeAppointmentToken = appointment.public_token;
     localStorage.setItem("trimtimeAppointmentToken", activeAppointmentToken);
-    showAppointment(appointment);
     document.querySelector("#appointment-panel").classList.add("hidden");
+    showAppointment(appointment);
+    await restoreActiveAppointments();
+    document.querySelector("#appointment-ticket-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     result.innerHTML = `
       <div class="appointment-success-box">
@@ -1537,102 +1718,159 @@ document.querySelector("#book-appointment").addEventListener("click", async () =
   }
 });
 
-function showAppointment(appointment) {
-  activeAppointmentDetails = appointment;
+function renderAppointmentsList(appointments) {
   const panel = document.querySelector("#appointment-ticket-panel");
-  if (!shopId || appointment.shop_id !== shopId) {
-    if (panel) panel.classList.add("hidden");
+  const container = document.querySelector("#appointment-tickets-container");
+  if (!panel || !container) return;
+
+  if (!appointments || !appointments.length) {
+    container.innerHTML = "";
+    panel.classList.add("hidden");
     return;
   }
+
   panel.classList.remove("hidden");
-  document.querySelector("#appointment-ticket-token").textContent = appointment.token;
-
   const now = Date.now();
-  const scheduledTime = new Date(appointment.scheduled_at).getTime();
-  const diffMinutes = Math.round((scheduledTime - now) / 60000);
 
-  let statusText = appointment.status.replace("_", " ");
-  let messageText = "Keep this booking token for your visit.";
+  container.innerHTML = appointments.map((appointment) => {
+    const scheduledTime = new Date(appointment.scheduled_at).getTime();
+    const diffMinutes = Math.round((scheduledTime - now) / 60000);
 
-  if (appointment.status === "confirmed" || appointment.status === "booked") {
-    if (diffMinutes > 0) {
-      const hours = Math.floor(diffMinutes / 60);
-      const mins = diffMinutes % 60;
-      const timeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
-      statusText = `Confirmed · Starts at ${formatAppDateTime(appointment.scheduled_at)}`;
-      messageText = `Your appointment is confirmed. Service begins at ${formatAppDateTime(appointment.scheduled_at)} (in ${timeRemaining}). Please arrive 5 minutes early.`;
-    } else {
-      statusText = "Slot active";
-      messageText = "Your scheduled appointment slot is starting now! Please notify the barber or take your chair.";
+    let statusText = (appointment.status || "booked").replace("_", " ");
+    let messageText = "Keep this booking token for your visit.";
+
+    if (appointment.status === "confirmed" || appointment.status === "booked") {
+      if (diffMinutes > 0) {
+        const hours = Math.floor(diffMinutes / 60);
+        const mins = diffMinutes % 60;
+        const timeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
+        statusText = `Confirmed · Starts at ${formatAppDateTime(appointment.scheduled_at)}`;
+        messageText = `Your appointment is confirmed. Service begins at ${formatAppDateTime(appointment.scheduled_at)} (in ${timeRemaining}). Please arrive 5 minutes early.`;
+      } else {
+        statusText = "Slot active";
+        messageText = "Your scheduled appointment slot is starting now! Please notify the barber or take your chair.";
+      }
+    } else if (appointment.status === "queued") {
+      if (diffMinutes > 0) {
+        const hours = Math.floor(diffMinutes / 60);
+        const mins = diffMinutes % 60;
+        const timeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
+        statusText = `Scheduled for ${formatAppDateTime(appointment.scheduled_at)}`;
+        messageText = `Your appointment is sequenced in the live queue for ${formatAppDateTime(appointment.scheduled_at)} (in ${timeRemaining}). Please arrive 5 minutes early.`;
+      } else {
+        statusText = "In Queue (Priority)";
+        messageText = "Your scheduled appointment slot has arrived! You are now in the live queue as PRIORITY.";
+      }
+    } else if (appointment.status === "serving") {
+      statusText = "In Chair";
+      messageText = "Your service is currently in progress.";
+    } else if (appointment.status === "cancelled") {
+      statusText = "Cancelled";
+      messageText = "This appointment was cancelled.";
+    } else if (appointment.status === "completed") {
+      statusText = "Completed";
+      messageText = "This appointment has been completed.";
     }
-  } else if (appointment.status === "queued") {
-    if (diffMinutes > 0) {
-      const hours = Math.floor(diffMinutes / 60);
-      const mins = diffMinutes % 60;
-      const timeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
-      statusText = `Scheduled for ${formatAppDateTime(appointment.scheduled_at)}`;
-      messageText = `Your appointment is sequenced in the live queue for ${formatAppDateTime(appointment.scheduled_at)} (in ${timeRemaining}). Please arrive 5 minutes early.`;
-    } else {
-      statusText = "In Queue (Priority)";
-      messageText = "Your scheduled appointment slot has arrived! You are now in the live queue as PRIORITY.";
-    }
-  } else if (appointment.status === "serving") {
-    statusText = "In Chair";
-    messageText = "Your service is currently in progress.";
-  } else if (appointment.status === "cancelled") {
-    statusText = "Cancelled";
-    messageText = "This appointment was cancelled.";
-  } else if (appointment.status === "completed") {
-    statusText = "Completed";
-    messageText = "This appointment has been completed.";
-  }
 
-  document.querySelector("#appointment-ticket-status").textContent = statusText;
-  document.querySelector("#appointment-ticket-details").textContent = `${appointment.service_name} · ${formatAppDateTime(appointment.scheduled_at)} · ${appointment.barber_name || "Any available barber"}`;
-  const terminal = ["cancelled", "completed", "no_show"].includes(appointment.status);
-  document.querySelector("#cancel-appointment").classList.toggle("hidden", terminal || appointment.status === "serving");
-  document.querySelector("#rate-appointment").classList.add("hidden");
-  const ratingSubmitted = localStorage.getItem("trimtimeRatedAppointmentToken") === appointment.public_token;
-  document.querySelector("#appointment-rating-form").classList.toggle("hidden", appointment.status !== "completed" || ratingSubmitted);
-  document.querySelector("#appointment-rebook").classList.toggle("hidden", appointment.status !== "completed");
-  document.querySelector("#appointment-ticket-message").textContent = messageText;
+    const bookedFor = appointment.customer_name ? `Booked for: ${escapeHtml(appointment.customer_name)} · ` : "";
+    const shopBadge = (appointment.shop_name && (!shopId || appointment.shop_id !== shopId)) ? ` · ${escapeHtml(appointment.shop_name)}` : "";
+    const terminal = ["cancelled", "completed", "no_show"].includes(appointment.status);
+    const canCancel = !terminal && appointment.status !== "serving";
+
+    return `
+      <div class="panel ticket appointment-ticket-card" data-token="${appointment.public_token}">
+        <p class="eyebrow">YOUR APPOINTMENT TICKET</p>
+        <div class="ticket-head">
+          <h2>${escapeHtml(appointment.token)}</h2>
+          <span>${escapeHtml(statusText)}</span>
+        </div>
+        <p class="appointment-details">${bookedFor}${escapeHtml(appointment.service_name)}${shopBadge} · ${formatAppDateTime(appointment.scheduled_at)} · ${escapeHtml(appointment.barber_name || "Any available barber")}</p>
+        <p class="appointment-message muted">${escapeHtml(messageText)}</p>
+        <div class="appointment-ticket-actions">
+          ${canCancel ? `<button class="ghost cancel-single-appointment-btn" type="button" data-cancel-token="${appointment.public_token}">Cancel appointment</button>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  container.querySelectorAll(".cancel-single-appointment-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const cancelToken = btn.dataset.cancelToken;
+      if (!cancelToken || !confirm("Cancel this appointment?")) return;
+      try {
+        btn.disabled = true;
+        btn.textContent = "Cancelling…";
+        await api("/api/my-appointment/cancel", {
+          method: "POST",
+          body: JSON.stringify({ public_token: cancelToken })
+        });
+        await restoreActiveAppointments();
+        await loadShop();
+      } catch (reason) {
+        showCustomerNotice(reason.message);
+        btn.disabled = false;
+        btn.textContent = "Cancel appointment";
+      }
+    });
+  });
 }
 
-async function restoreActiveAppointment() {
-  let appt = null;
+function showAppointment(appointment) {
+  if (!appointment) return;
+  activeAppointmentDetails = appointment;
+  activeAppointmentToken = appointment.public_token;
+  localStorage.setItem("trimtimeAppointmentToken", activeAppointmentToken);
+
+  const existingIdx = activeAppointments.findIndex((a) => a.public_token === appointment.public_token);
+  if (existingIdx >= 0) {
+    activeAppointments[existingIdx] = appointment;
+  } else {
+    activeAppointments.unshift(appointment);
+  }
+  renderAppointmentsList(activeAppointments);
+}
+
+async function restoreActiveAppointments() {
+  let list = [];
   if (customerToken) {
     try {
-      appt = await api("/api/customer-auth/active-appointment");
+      list = await api("/api/customer-auth/active-appointments");
     } catch {
-      appt = null;
+      list = [];
     }
   }
-  if (!appt && activeAppointmentToken) {
+  if (!list.length && activeAppointmentToken) {
     try {
-      appt = await api(`/api/my-appointment/${activeAppointmentToken}`);
+      const single = await api(`/api/my-appointment/${activeAppointmentToken}`);
+      if (single && !["cancelled", "completed", "no_show"].includes(single.status)) {
+        list = [single];
+      }
     } catch {
       localStorage.removeItem("trimtimeAppointmentToken");
       activeAppointmentToken = null;
     }
   }
-  if (appt) {
-    activeAppointmentToken = appt.public_token;
+  activeAppointments = list;
+  if (list.length > 0) {
+    activeAppointmentToken = list[0].public_token;
     localStorage.setItem("trimtimeAppointmentToken", activeAppointmentToken);
-    showAppointment(appt);
+    activeAppointmentDetails = list[0];
+  } else {
+    activeAppointmentDetails = null;
   }
+  renderAppointmentsList(list);
 }
 
-async function refreshAppointment() {
-  await restoreActiveAppointment();
-}
+const restoreActiveAppointment = restoreActiveAppointments;
+const refreshAppointment = restoreActiveAppointments;
 
-document.querySelector("#cancel-appointment").addEventListener("click", async () => {
+document.querySelector("#cancel-appointment")?.addEventListener("click", async () => {
   if (!activeAppointmentToken || !confirm("Cancel this appointment?")) return;
   try { showAppointment(await api("/api/my-appointment/cancel", { method: "POST", body: JSON.stringify({ public_token: activeAppointmentToken }) })); }
   catch (reason) { document.querySelector("#appointment-ticket-message").textContent = reason.message; }
 });
 
-document.querySelector("#leave-queue").addEventListener("click", async () => {
+document.querySelector("#leave-queue")?.addEventListener("click", async () => {
   if (!activeToken) return;
   await api("/api/my-queue/cancel", { method: "POST", body: JSON.stringify({ public_token: activeToken }) });
   localStorage.removeItem("trimtimeQueueToken");
@@ -1642,7 +1880,7 @@ document.querySelector("#leave-queue").addEventListener("click", async () => {
   await loadShop();
 });
 
-document.querySelector("#rating-form").addEventListener("submit", async (event) => {
+document.querySelector("#rating-form")?.addEventListener("submit", async (event) => {
   event.preventDefault(); const result = document.querySelector("#rating-result"); result.textContent = "";
   if (!activeToken) { result.textContent = "This completed visit can no longer be found."; return; }
   if (!document.querySelector("#shop-rating").value) { result.textContent = "Select a shop rating from 1 to 5 stars, or skip this optional feedback."; return; }

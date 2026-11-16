@@ -23,9 +23,9 @@ form { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:28px; }
 label { display:flex; flex-direction:column; gap:8px; font-weight:600; }
 input,select { width:100%; border:1px solid var(--line); border-radius:10px; background:white; padding:14px; font:inherit; color:var(--ink); }
 textarea { width:100%;min-height:110px;resize:vertical;border:1px solid var(--line);border-radius:10px;background:white;padding:14px;font:inherit;color:var(--ink); }
-.field-help{display:block;margin-top:7px;color:#66736b;font-weight:400;line-height:1.35}.quick-service-picker{display:block;max-width:520px;margin:18px 0 0}.quick-service-picker select{margin-top:7px;background:white}.service-checkbox-dropdown{position:relative;margin-top:7px}.service-checkbox-dropdown>button{width:100%;display:flex;justify-content:space-between;align-items:center;background:white;color:var(--ink);border:1px solid var(--line);font-weight:500;text-align:left}.service-checkbox-dropdown>button:hover{background:#f4f7f5}.service-checkbox-options{position:absolute;z-index:25;top:calc(100% + 6px);left:0;right:0;max-height:260px;overflow:auto;padding:8px;background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 35px #173c3526}.service-checkbox-options label{display:flex;align-items:center;justify-content:flex-start;gap:12px;padding:11px 9px;margin:0;border-radius:8px;cursor:pointer}.service-checkbox-options label:hover{background:#eef5f2}.service-checkbox-options input{width:19px;height:19px;margin:0;order:-1;flex:0 0 19px}.service-checkbox-options span{display:flex;justify-content:space-between;gap:18px;width:100%;font-weight:600}.service-checkbox-options small{color:#66736b;font-weight:600}.queue-assignment-controls{display:grid;grid-template-columns:minmax(150px,1fr) minmax(150px,1fr);gap:10px;margin-top:7px}.queue-assignment-controls label{font-size:.76rem;color:#697269}.queue-assignment-controls select{display:block;width:100%;max-width:none;margin-top:4px}
+.field-help{display:block;margin-top:7px;color:#66736b;font-weight:400;line-height:1.35}.quick-service-picker{display:block;max-width:520px;margin:18px 0 0}.quick-service-picker select{margin-top:7px;background:white}.service-checkbox-dropdown{position:relative;margin-top:7px}.service-checkbox-dropdown>button{width:100%;display:flex;justify-content:space-between;align-items:center;background:white;color:var(--ink);border:1px solid var(--line);font-weight:500;text-align:left}.service-checkbox-dropdown>button:hover{background:#f4f7f5}.queue-assignment-controls{display:grid;grid-template-columns:minmax(150px,1fr) minmax(150px,1fr);gap:10px;margin-top:7px}.queue-assignment-controls label{font-size:.76rem;color:#697269}.queue-assignment-controls select{display:block;width:100%;max-width:none;margin-top:4px}
 @media(max-width:760px){.queue-assignment-controls{grid-template-columns:1fr}}
-.service-checkbox-options label,.queue-service-checks label{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center;gap:12px;text-align:left}.service-checkbox-options input,.queue-service-checks input{grid-column:1;width:18px;height:18px;margin:0;justify-self:start}.service-checkbox-options span,.queue-service-checks span{grid-column:2;display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}.queue-service-picker{position:relative}.queue-service-picker summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:10px;background:white;padding:10px 12px;color:var(--ink);font-size:.9rem}.queue-service-picker summary::-webkit-details-marker{display:none}.queue-service-picker summary::after{content:"⌄";float:right}.queue-service-picker[open] summary::after{content:"⌃"}.queue-service-checks{position:absolute;z-index:30;top:calc(100% + 5px);left:0;min-width:260px;max-height:250px;overflow:auto;padding:8px;background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 35px #173c3526}.queue-service-checks label{padding:9px;border-radius:8px;color:var(--ink);font-size:.85rem}.queue-service-checks label:hover{background:#eef5f2}.queue-service-checks small{color:#66736b}
+.queue-service-checks label{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center;gap:12px;text-align:left}.queue-service-checks input{grid-column:1;width:18px;height:18px;margin:0;justify-self:start}.queue-service-checks span{grid-column:2;display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}.queue-service-picker{position:relative}.queue-service-picker summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:10px;background:white;padding:10px 12px;color:var(--ink);font-size:.9rem}.queue-service-picker summary::-webkit-details-marker{display:none}.queue-service-picker summary::after{content:"⌄";float:right}.queue-service-picker[open] summary::after{content:"⌃"}.queue-service-checks{position:absolute;z-index:30;top:calc(100% + 5px);left:0;min-width:260px;max-height:250px;overflow:auto;padding:8px;background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 35px #173c3526}.queue-service-checks label{padding:9px;border-radius:8px;color:var(--ink);font-size:.85rem}.queue-service-checks label:hover{background:#eef5f2}.queue-service-checks small{color:#66736b}
 .queue-assignment-controls{align-items:end}.queue-assignment-control{display:grid;grid-template-rows:auto 42px;gap:4px;min-width:0}.control-caption{font-size:.76rem!important;color:#697269!important}.queue-assignment-control>select,.queue-assignment-control summary{height:42px;margin:0;padding:9px 11px}.queue-assignment-control>select{max-width:none;width:100%}
 button { border:0; border-radius:10px; padding:15px 18px; background:var(--ink); color:white; font:600 1rem inherit; cursor:pointer; } button:disabled { opacity:.45;cursor:not-allowed; } form button { grid-column:1/-1; display:flex; justify-content:space-between; }
 button:hover { background:#2c4233; }.secondary { background:#dfe4d8;color:var(--ink); }.ghost { background:transparent;color:var(--red);border:1px solid #e2b8b1; }
@@ -1183,6 +1183,43 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   color: white;
   box-shadow: 0 4px 14px rgba(16, 44, 39, 0.22);
 }
+.auth-switch-note {
+  margin-top: 18px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.auth-text-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: #173c35;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  display: inline;
+}
+.auth-text-link:hover {
+  color: #245c52;
+}
+.otp-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.otp-dev-banner {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
 
 /* Staff Auth Tab Switcher */
 .staff-auth-tabs-wrap {
@@ -1443,102 +1480,476 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   color: #14532d;
 }
 
-/* Staff Walk-in Popup Modal Styles */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(14, 28, 24, 0.65);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  overflow-y: auto;
-}
-.modal-overlay.hidden {
-  display: none !important;
-}
-.modal-card {
+/* Staff Walk-in Tab Section Styles */
+.walkin-panel {
+  max-width: 680px;
+  margin: 24px auto;
   background: white;
-  border-radius: 18px;
+  border-radius: 20px;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(16, 44, 39, 0.06);
+}
+.walkin-panel .section-heading {
+  margin-bottom: 18px;
+  border-bottom: 1px solid #edf2ee;
+  padding-bottom: 16px;
+}
+.walkin-panel .section-heading h2 {
+  font-size: 1.85rem;
+  color: #173c35;
+  margin: 4px 0 6px;
+}
+.walkin-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 18px !important;
+  margin-top: 18px !important;
+}
+.walkin-form label {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+  font-size: 0.92rem !important;
+}
+.walkin-form .control-caption {
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  color: var(--ink) !important;
+}
+.walkin-form .form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .walkin-form .form-row-2 {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+.walkin-actions-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+.walkin-submit-btn {
   width: 100%;
-  max-width: 520px;
-  box-shadow: 0 20px 50px rgba(10, 30, 24, 0.28);
-  border: 1px solid #d4deda;
-  padding: 24px 28px;
-  position: relative;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: modalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@keyframes modalFadeIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-.modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #eef2f0;
-  padding-bottom: 12px;
-}
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.35rem;
-  color: #173c35;
-}
-.modal-close-btn {
-  background: transparent;
-  border: none;
-  font-size: 1.4rem;
-  color: #64756c;
-  cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 8px;
-  line-height: 1;
-  transition: all 0.15s ease;
-}
-.modal-close-btn:hover {
-  background: #f0f4f2;
-  color: #173c35;
-}
-.modal-actions-row {
-  display: flex;
-  gap: 12px;
-  margin-top: 14px;
-}
-.modal-submit-btn {
-  flex: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: #173c35;
   color: white;
-  padding: 14px 18px;
+  padding: 16px 22px;
   border-radius: 12px;
   font-weight: 700;
+  font-size: 1.02rem;
   border: none;
   cursor: pointer;
-  transition: background 0.18s;
+  transition: all 0.18s ease;
 }
-.modal-submit-btn:hover {
-  background: #245c52;
-}
-.primary-action-btn {
-  background: #173c35;
-  color: white;
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 0.9rem;
-  border: none;
-  cursor: pointer;
-  transition: all 0.18s;
-}
-.primary-action-btn:hover {
+.walkin-submit-btn:hover {
   background: #245c52;
   transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(23, 60, 53, 0.2);
+}
+.walkin-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========================================================
+   Professional Alignment & Hierarchy for Appointment Form
+   ======================================================== */
+#appointment-form {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 18px !important;
+  margin-top: 18px !important;
+}
+
+.appointment-other-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+  margin-bottom: 6px;
+  padding: 18px 20px;
+  background: #f4f8f6;
+  border: 1px solid #cfe2db;
+  border-radius: 14px;
+}
+
+.appointment-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  width: 100%;
+  align-items: start;
+}
+
+.appointment-form-row.single-field {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 680px) {
+  .appointment-form-row {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+}
+
+.appointment-field-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  position: relative;
+}
+
+.field-label-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.field-label-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #173c35;
+}
+
+.mandatory-pill {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #be123c;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.optional-pill {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #557268;
+  background: #edf5f2;
+  border: 1px solid #c9ded7;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Height and Style Matching for Form Inputs */
+#appointment-service-toggle,
+#appointment-barber,
+#appointment-date,
+#appointment-other-name,
+#appointment-other-age,
+#appointment-other-phone {
+  min-height: 50px !important;
+  height: 50px !important;
+  padding: 12px 16px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #cfdad4 !important;
+  background: white !important;
+  font: inherit !important;
+  font-size: 0.94rem !important;
+  font-weight: 600 !important;
+  color: #173c35 !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: border-color 0.18s, box-shadow 0.18s !important;
+}
+
+#appointment-service-toggle:focus,
+#appointment-service-toggle:hover,
+#appointment-barber:focus,
+#appointment-barber:hover,
+#appointment-date:focus,
+#appointment-date:hover,
+#appointment-other-name:focus,
+#appointment-other-name:hover,
+#appointment-other-age:focus,
+#appointment-other-age:hover,
+#appointment-other-phone:focus,
+#appointment-other-phone:hover {
+  border-color: #245c52 !important;
+  box-shadow: 0 0 0 3px rgba(36, 92, 82, 0.12) !important;
+  outline: none !important;
+}
+
+#appointment-service-toggle {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+#appointment-service-toggle span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 8px;
+  color: #173c35;
+}
+
+#appointment-service-toggle b {
+  font-size: 0.95rem;
+  color: #245c52;
+  transition: transform 0.2s ease;
+}
+
+#appointment-service-toggle[aria-expanded="true"] b {
+  transform: rotate(180deg);
+}
+
+.field-help {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.35;
+  min-height: 18px;
+}
+
+/* Service Checkbox Dropdown Picker */
+.service-checkbox-dropdown {
+  position: relative !important;
+  width: 100% !important;
+}
+
+.service-checkbox-options {
+  position: absolute !important;
+  z-index: 1000 !important;
+  top: calc(100% + 8px) !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  min-width: min(100%, 340px) !important;
+  max-height: 280px !important;
+  overflow-y: auto !important;
+  padding: 8px !important;
+  background: #ffffff !important;
+  border: 1.5px solid #245c52 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 18px 45px rgba(15, 35, 28, 0.22) !important;
+  box-sizing: border-box !important;
+}
+
+.service-checkbox-dropdown .service-checkbox-options label.service-checkbox-item,
+.service-checkbox-options label.service-checkbox-item,
+.service-checkbox-item,
+.staff-service-option {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  margin: 5px 0 !important;
+  border-radius: 10px !important;
+  background: #fbfdfc !important;
+  border: 1px solid #d9e6df !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-height: 48px !important;
+}
+
+.service-checkbox-dropdown .service-checkbox-options label.service-checkbox-item:hover,
+.service-checkbox-options label.service-checkbox-item:hover,
+.service-checkbox-item:hover,
+.staff-service-option:hover {
+  background: #edf7f3 !important;
+  border-color: #9eccbb !important;
+}
+
+.service-checkbox-dropdown .service-checkbox-options label.service-checkbox-item:has(input:checked),
+.service-checkbox-options label.service-checkbox-item:has(input:checked),
+.service-checkbox-item:has(input:checked),
+.staff-service-option:has(input:checked) {
+  background: #eaf6f0 !important;
+  border-color: #245c52 !important;
+  box-shadow: 0 2px 8px rgba(36, 92, 82, 0.12) !important;
+}
+
+.service-checkbox-dropdown .service-checkbox-options label.service-checkbox-item input[type="checkbox"],
+.service-checkbox-options label.service-checkbox-item input[type="checkbox"],
+.service-checkbox-item input[type="checkbox"],
+.staff-service-option input[type="checkbox"] {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 18px !important;
+  height: 18px !important;
+  accent-color: #245c52 !important;
+  margin: 0 !important;
+  justify-self: center !important;
+  align-self: center !important;
+  cursor: pointer !important;
+}
+
+.service-item-content {
+  grid-column: 2 / -1 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.service-option-name,
+.staff-service-option .service-option-name,
+.staff-service-option-content strong {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  font-weight: 700 !important;
+  color: #173c35 !important;
+  font-size: 0.93rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-align: left !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  display: block !important;
+  align-self: center !important;
+}
+
+.service-option-badge,
+.service-option-meta,
+.staff-service-option .service-option-badge,
+.staff-service-option-content small {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  font-weight: 700 !important;
+  color: #1a564b !important;
+  font-size: 0.8rem !important;
+  background: #e0f2ec !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  white-space: nowrap !important;
+  justify-self: end !important;
+  align-self: center !important;
+  display: inline-block !important;
+  margin: 0 !important;
+}
+
+/* Multiple Appointment Tickets List */
+.appointment-tickets-section {
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.appointment-tickets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.appointment-ticket-card {
+  margin: 0 !important;
+}
+.appointment-ticket-card .ticket-head h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #102c27;
+  margin: 0;
+}
+.appointment-ticket-card .ticket-head span {
+  text-transform: capitalize;
+  background: var(--lime);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #173c35;
+}
+.appointment-ticket-card .ticket-details {
+  font-weight: 600;
+  color: #173c35;
+  margin: 12px 0 6px;
+  font-size: 0.96rem;
+}
+.appointment-ticket-card .ticket-message {
+  color: #5a6b63;
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+}
+.appointment-ticket-card .ticket-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.appointment-ticket-card .cancel-single-appointment-btn {
+  padding: 9px 16px;
+  font-size: 0.88rem;
+}
+
+/* Multiple Live Queue Tickets List */
+.queue-tickets-section {
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.queue-tickets-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.queue-ticket-card {
+  margin: 0 !important;
+}
+.queue-ticket-card .ticket-head h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #102c27;
+  margin: 0;
+}
+.queue-ticket-card .ticket-head span {
+  text-transform: capitalize;
+  background: var(--lime);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #173c35;
+}
+.queue-ticket-card .ticket-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 20px 0;
+}
+.queue-ticket-card .ticket-grid div {
+  background: var(--ink);
+  color: white;
+  padding: 22px;
+  border-radius: 14px;
+}
+.queue-ticket-card .ticket-grid strong {
+  font-size: 2rem;
+}
+.queue-ticket-card .ticket-grid span {
+  color: #bfc8c0;
+  font-size: .8rem;
+}
+.queue-ticket-card .ticket-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.queue-ticket-card .leave-single-queue-btn {
+  padding: 9px 16px;
+  font-size: 0.88rem;
 }

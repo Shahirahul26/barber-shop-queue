@@ -48,12 +48,23 @@ def queue_metrics(db: Session, shop_id: int) -> tuple[dict[int, dict], int]:
         Appointment.barber_id == barber_id, Appointment.status.in_(("booked", "confirmed", "queued")),
         Appointment.scheduled_at >= now).order_by(Appointment.scheduled_at)).all()) for barber_id in barber_ids}
 
+    PREPARATION_BUFFER_MINUTES = 5
+
     def wait_with_reservations(barber_id: int, duration: int) -> int:
         candidate = now + timedelta(minutes=workloads[barber_id])
+        buffer = timedelta(minutes=PREPARATION_BUFFER_MINUTES)
         for appointment in reservations[barber_id]:
             start = appointment.scheduled_at if appointment.scheduled_at.tzinfo else appointment.scheduled_at.replace(tzinfo=timezone.utc)
-            end = start + timedelta(minutes=appointment.total_duration_minutes)
-            if candidate < end and candidate + timedelta(minutes=duration) > start:
+            appt_duration = appointment.total_duration_minutes or (appointment.service.duration_minutes if appointment.service else 30)
+            end = start + timedelta(minutes=appt_duration)
+            if candidate >= end:
+                continue
+            if candidate < start:
+                # If service + preparation buffer fits before next appointment start, utilize this open gap
+                if candidate + timedelta(minutes=duration) <= start - buffer:
+                    break
+                candidate = end
+            else:
                 candidate = end
         return max(0, int((candidate - now).total_seconds() // 60))
 

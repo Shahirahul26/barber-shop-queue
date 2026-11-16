@@ -454,7 +454,7 @@ document.querySelector("#registration-form").addEventListener("submit", async (e
 });
 
 function resetDashboardTabs() {
-  closeWalkinModal();
+  resetWalkinForm();
   document.querySelectorAll(".tab-section").forEach((section) => {
     section.classList.toggle("hidden", section.id !== "tab-queue");
   });
@@ -570,12 +570,10 @@ function fillStaffBarberSelect() {
   if (servicesList) {
     servicesList.innerHTML = (shop.services && shop.services.length)
       ? shop.services.map((item) => `
-        <label class="staff-service-option">
+        <label class="service-checkbox-item staff-service-option">
           <input type="checkbox" name="staff_service" value="${item.id}" data-name="${escapeHtml(item.name)}" data-duration="${item.duration_minutes}" data-price="${item.price_rupees}" />
-          <span class="staff-service-option-content">
-            <strong>${escapeHtml(item.name)}</strong>
-            <small>${item.duration_minutes} min · ₹${item.price_rupees}</small>
-          </span>
+          <span class="service-option-name">${escapeHtml(item.name)}</span>
+          <span class="service-option-badge">${item.duration_minutes} min · ₹${item.price_rupees}</span>
         </label>
       `).join("")
       : '<p class="muted">No services available (add a service first).</p>';
@@ -592,18 +590,7 @@ function fillStaffBarberSelect() {
   }
 }
 
-function openWalkinModal() {
-  const modal = document.querySelector("#walkin-modal");
-  if (!modal) return;
-  modal.classList.remove("hidden");
-  fillStaffBarberSelect();
-  setTimeout(() => document.querySelector("#staff-queue-name")?.focus(), 50);
-}
-
-function closeWalkinModal() {
-  const modal = document.querySelector("#walkin-modal");
-  if (!modal) return;
-  modal.classList.add("hidden");
+function resetWalkinForm() {
   const form = document.querySelector("#staff-queue-form");
   if (form) form.reset();
   const toggle = document.querySelector("#staff-service-toggle");
@@ -619,13 +606,6 @@ function closeWalkinModal() {
   const result = document.querySelector("#staff-queue-result");
   if (result) result.textContent = "";
 }
-
-document.querySelector("#close-walkin-modal")?.addEventListener("click", closeWalkinModal);
-document.querySelector("#cancel-walkin-modal")?.addEventListener("click", closeWalkinModal);
-document.querySelector("#toolbar-open-walkin-btn")?.addEventListener("click", openWalkinModal);
-document.querySelector("#walkin-modal")?.addEventListener("click", (e) => {
-  if (e.target === document.querySelector("#walkin-modal")) closeWalkinModal();
-});
 
 const staffServiceToggle = document.querySelector("#staff-service-toggle");
 const staffServiceOptions = document.querySelector("#staff-service-options");
@@ -746,10 +726,6 @@ async function deleteBarber(id) {
 
 document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
   const target = button.dataset.tab;
-  if (target === "walkin") {
-    openWalkinModal();
-    return;
-  }
   const fromDashboardNav = Boolean(button.closest(".dashboard-nav"));
   const managementTargets = ["services", "team", "analytics", "settings", "shop"];
   const canManage = ["owner", "manager"].includes(staffRole);
@@ -759,7 +735,12 @@ document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListe
   if (["queue", "appointments", "walkin"].includes(target)) {
     document.querySelector("#barber-profile-panel")?.classList.add("hidden");
   }
-  if (target === "account") {
+  if (target === "walkin") {
+    fillStaffBarberSelect();
+    document.querySelector("#tab-walkin")?.classList.remove("hidden");
+    document.querySelector("#account-management-nav")?.classList.add("hidden");
+    setTimeout(() => document.querySelector("#staff-queue-name")?.focus(), 50);
+  } else if (target === "account") {
     if (canManage) managementTargets.forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
     else ["analytics", "settings"].forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
     document.querySelector("#account-management-nav").classList.remove("hidden");
@@ -822,7 +803,8 @@ document.querySelector("#staff-queue-form").addEventListener("submit", async (ev
         source: "walk_in"
       })
     });
-    closeWalkinModal();
+    resetWalkinForm();
+    resetDashboardTabs();
     const queueEntries = await request(`/api/shops/${shopId}/queue`);
     renderQueue(queueEntries); document.querySelector("#queue-nav-count").textContent = queueEntries.filter((entry) => ["waiting", "serving"].includes(entry.status)).length;
     message(`Token ${created.token} generated for ${created.customer_name}`);

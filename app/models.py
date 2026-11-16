@@ -261,6 +261,14 @@ class QueueEntry(Base):
     appointment: Mapped["Appointment"] = relationship()
     push_subscriptions: Mapped[list["PushSubscription"]] = relationship(back_populates="queue_entry", cascade="all, delete-orphan")
 
+    @property
+    def token_display(self) -> str:
+        if self.appointment_id and getattr(self, "appointment", None):
+            num = self.appointment.daily_booking_number or self.appointment.id
+            return f"B{num:02d}"
+        num = self.daily_token_number or self.id
+        return f"A{num:02d}"
+
 
 class PushSubscription(Base):
     __tablename__ = "push_subscriptions"

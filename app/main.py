@@ -19,7 +19,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Quer
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .config import settings, validate_production_settings
@@ -153,7 +153,25 @@ def normalize_phone(value: str | None) -> str | None:
 
 def appointment_view(item: Appointment) -> dict:
     service_ids = item.service_ids or [item.service_id]
-    return {"id": item.id, "public_token": item.public_token, "token": f"B{(item.daily_booking_number or item.id):02d}", "shop_id": item.shop_id, "service_id": item.service_id, "service_ids": service_ids, "barber_id": item.barber_id, "customer_name": item.customer_name, "phone": item.phone, "service_name": item.service_names or item.service.name, "total_duration_minutes": item.total_duration_minutes or item.service.duration_minutes, "total_price_rupees": item.total_price_rupees if item.total_price_rupees is not None else item.service.price_rupees, "barber_name": item.barber.name if item.barber else None, "scheduled_at": item.scheduled_at, "status": item.status}
+    shop_name = item.shop.name if getattr(item, "shop", None) else None
+    return {
+        "id": item.id,
+        "public_token": item.public_token,
+        "token": f"B{(item.daily_booking_number or item.id):02d}",
+        "shop_id": item.shop_id,
+        "shop_name": shop_name,
+        "service_id": item.service_id,
+        "service_ids": service_ids,
+        "barber_id": item.barber_id,
+        "customer_name": item.customer_name,
+        "phone": item.phone,
+        "service_name": item.service_names or (item.service.name if item.service else "Service"),
+        "total_duration_minutes": item.total_duration_minutes or (item.service.duration_minutes if item.service else 30),
+        "total_price_rupees": item.total_price_rupees if item.total_price_rupees is not None else (item.service.price_rupees if item.service else 0),
+        "barber_name": item.barber.name if item.barber else None,
+        "scheduled_at": item.scheduled_at,
+        "status": item.status,
+    }
 
 
 def appointment_duration(item: Appointment) -> int:
@@ -609,13 +627,38 @@ def verify_customer_otp(payload: CustomerOtpVerify, db: Session = Depends(get_db
         customer.name = payload.name.strip()
         customer.age = payload.age
         customer.gender = payload.gender
+    elif payload.name and not customer.name:
+        customer.name = payload.name.strip()
+    if payload.phone and not customer.phone:
+        customer.phone = normalize_phone(payload.phone)
+    if payload.mpin:
+        customer.mpin_hash = hash_password(payload.mpin)
+        customer.mpin_set_at = now
     customer.is_verified = True
     customer.terms_accepted_at = customer.terms_accepted_at or now
     customer.otp_hash = None
     customer.otp_expires_at = None
     customer.otp_attempts = 0
+    if payload.device_id:
+        remember_device(db, device_id=payload.device_id, device_name=payload.device_name, customer_id=customer.id)
     db.commit()
-    return {"verification_token": create_mpin_verification_token(customer.id, payload.reset_mpin), "requires_mpin_setup": not bool(customer.mpin_hash) or payload.reset_mpin, "customer": {"id": customer.id, "name": customer.name, "age": customer.age, "gender": customer.gender, "email": customer.email, "phone": customer.phone}}
+
+    requires_mpin = not bool(customer.mpin_hash) or payload.reset_mpin
+    response_data = {
+        "access_token": create_customer_token(customer.id),
+        "token_type": "bearer",
+        "verification_token": create_mpin_verification_token(customer.id, payload.reset_mpin),
+        "requires_mpin_setup": requires_mpin,
+        "customer": {
+            "id": customer.id,
+            "name": customer.name,
+            "age": customer.age,
+            "gender": customer.gender,
+            "email": customer.email,
+            "phone": customer.phone,
+        },
+    }
+    return response_data
 
 
 @app.post("/api/customer-auth/verify-firebase-phone")
@@ -773,21 +816,65 @@ def customer_active_queue(request: Request, db: Session = Depends(get_db)):
     return queue_view(db, entry) if entry else None
 
 
+@app.get("/api/customer-auth/active-queues", response_model=list[QueueEntryOut])
+def customer_active_queues(request: Request, db: Session = Depends(get_db)):
+    customer = optional_customer(request, db)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Customer login required")
+    conds = [QueueEntry.customer_id == customer.id]
+    if customer.phone:
+        conds.append(QueueEntry.phone == customer.phone)
+    entries = db.scalars(
+        select(QueueEntry)
+        .options(joinedload(QueueEntry.service), joinedload(QueueEntry.barber), joinedload(QueueEntry.appointment))
+        .where(
+            or_(*conds),
+            QueueEntry.source == "online",
+            QueueEntry.status.in_((QueueStatus.WAITING, QueueStatus.SERVING, QueueStatus.SKIPPED)),
+        )
+        .order_by(QueueEntry.joined_at.asc(), QueueEntry.id.asc())
+    ).all()
+    return [queue_view(db, entry) for entry in entries]
+
+
 @app.get("/api/customer-auth/active-appointment", response_model=AppointmentOut | None)
 def customer_active_appointment(request: Request, db: Session = Depends(get_db)):
     customer = optional_customer(request, db)
     if customer is None:
         raise HTTPException(status_code=401, detail="Customer login required")
+    conds = [Appointment.customer_id == customer.id]
+    if customer.phone:
+        conds.append(Appointment.phone == customer.phone)
     appointment = db.scalar(
         select(Appointment)
-        .options(joinedload(Appointment.service), joinedload(Appointment.barber))
+        .options(joinedload(Appointment.shop), joinedload(Appointment.service), joinedload(Appointment.barber))
         .where(
-            Appointment.customer_id == customer.id,
+            or_(*conds),
             Appointment.status.in_(("booked", "confirmed", "queued", "serving")),
         )
-        .order_by(Appointment.scheduled_at.desc(), Appointment.id.desc())
+        .order_by(Appointment.scheduled_at.asc(), Appointment.id.asc())
     )
     return appointment_view(appointment) if appointment else None
+
+
+@app.get("/api/customer-auth/active-appointments", response_model=list[AppointmentOut])
+def customer_active_appointments(request: Request, db: Session = Depends(get_db)):
+    customer = optional_customer(request, db)
+    if customer is None:
+        raise HTTPException(status_code=401, detail="Customer login required")
+    conds = [Appointment.customer_id == customer.id]
+    if customer.phone:
+        conds.append(Appointment.phone == customer.phone)
+    appointments = db.scalars(
+        select(Appointment)
+        .options(joinedload(Appointment.shop), joinedload(Appointment.service), joinedload(Appointment.barber))
+        .where(
+            or_(*conds),
+            Appointment.status.in_(("booked", "confirmed", "queued", "serving")),
+        )
+        .order_by(Appointment.scheduled_at.asc(), Appointment.id.asc())
+    ).all()
+    return [appointment_view(appt) for appt in appointments]
 
 
 @app.get("/api/customer-auth/history")
@@ -1183,19 +1270,21 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
         QueueEntry.shop_id == shop_id, QueueEntry.queue_day == queue_day
     )) or 0) + 1
     identity_filters = []
+    MAX_ACTIVE_QUEUE_TICKETS = 3
     if customer:
         # Lock the verified customer row so simultaneous requests cannot bypass the limit.
         db.execute(select(CustomerUser.id).where(CustomerUser.id == customer.id).with_for_update()).scalar_one()
-        active_in_shop = db.scalar(select(QueueEntry).where(
+        active_in_shop_list = list(db.scalars(select(QueueEntry).where(
             QueueEntry.shop_id == shop_id,
             QueueEntry.source == "online",
             QueueEntry.status.in_([QueueStatus.WAITING, QueueStatus.SERVING]),
             QueueEntry.customer_id == customer.id
-        ))
-        if active_in_shop:
+        )).all())
+        if len(active_in_shop_list) >= MAX_ACTIVE_QUEUE_TICKETS:
+            tokens_str = ", ".join(f"#{item.token_display}" for item in active_in_shop_list)
             raise HTTPException(
                 status_code=409,
-                detail=f"You already have an active ticket (#{active_in_shop.token_display}) in this shop's queue. Please view your active ticket on screen or cancel it before joining again."
+                detail=f"You already have {len(active_in_shop_list)} active tickets ({tokens_str}) in this shop's queue. Maximum 3 active tickets are allowed at a time."
             )
         identity_filters.append(QueueEntry.customer_id == customer.id)
         if customer.phone:
@@ -1203,6 +1292,24 @@ async def join_queue(shop_id: int, payload: QueueJoin, request: Request, db: Ses
         if customer.email:
             identity_filters.append(func.lower(QueueEntry.email) == customer.email.lower())
     else:
+        if payload.phone or payload.email:
+            filters = []
+            if payload.phone:
+                filters.append(QueueEntry.phone == payload.phone)
+            if payload.email:
+                filters.append(func.lower(QueueEntry.email) == str(payload.email).lower())
+            active_anon_list = list(db.scalars(select(QueueEntry).where(
+                QueueEntry.shop_id == shop_id,
+                QueueEntry.source == "online",
+                QueueEntry.status.in_([QueueStatus.WAITING, QueueStatus.SERVING]),
+                or_(*filters)
+            )).all())
+            if len(active_anon_list) >= MAX_ACTIVE_QUEUE_TICKETS:
+                tokens_str = ", ".join(f"#{item.token_display}" for item in active_anon_list)
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"You already have {len(active_anon_list)} active tickets ({tokens_str}) in this shop's queue. Maximum 3 active tickets are allowed at a time."
+                )
         if payload.phone:
             identity_filters.append(QueueEntry.phone == payload.phone)
         if payload.email:
@@ -1725,9 +1832,9 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
     if not payload.book_for_other:
         ident_checks = []
         if customer:
-            ident_checks.append(Appointment.customer_id == customer.id)
+            ident_checks.append(and_(Appointment.customer_id == customer.id, ~Appointment.customer_name.contains("(Age: ")))
         if payload.phone:
-            ident_checks.append(Appointment.phone == payload.phone)
+            ident_checks.append(and_(Appointment.phone == payload.phone, ~Appointment.customer_name.contains("(Age: ")))
         if ident_checks:
             existing_active = db.scalar(select(Appointment).where(*existing_conds, or_(*ident_checks)))
             if existing_active:
@@ -1756,7 +1863,7 @@ async def create_appointment(shop_id: int, payload: AppointmentCreate, request: 
 
     item = Appointment(
         shop_id=shop_id,
-        customer_id=None if payload.book_for_other else (customer.id if customer else None),
+        customer_id=customer.id if customer else None,
         service_id=service.id,
         service_ids=service_ids,
         service_names=service_names,

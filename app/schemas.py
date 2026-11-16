@@ -28,8 +28,12 @@ class CustomerOtpVerify(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=100)
     age: int | None = Field(default=None, ge=5, le=110)
     gender: str | None = Field(default=None, pattern="^(male|female|non_binary|prefer_not_to_say)$")
+    phone: str | None = Field(default=None, max_length=20)
+    mpin: str | None = Field(default=None, pattern="^[0-9]{6}$")
     terms_accepted: bool = False
     reset_mpin: bool = False
+    device_id: str | None = None
+    device_name: str | None = None
 
 
 class FirebasePhoneVerify(BaseModel):
@@ -374,6 +378,7 @@ class AppointmentOut(BaseModel):
     public_token: str
     token: str
     shop_id: int
+    shop_name: str | None = None
     service_id: int
     service_ids: list[int]
     barber_id: int | None
