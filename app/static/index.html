@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0f172a" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="stylesheet" href="/static/styles.css?v=75" />
+    <link rel="stylesheet" href="/static/styles.css?v=77" />
     <title>TrimTime · Live Customer Queue & Bookings</title>
   </head>
   <body class="customer-page">
@@ -16,50 +16,95 @@
       </nav>
     </header>
 
-    <section id="customer-auth" class="customer-auth">
-      <div class="auth-brand-visual" id="customer-auth-image">
-        <div>
-          <p class="eyebrow" data-software-name>TRIMTIME CUSTOMER</p>
-          <h1>Skip the waiting room.</h1>
-          <p>Scan, sign in and follow your live queue and appointments in real time.</p>
+    <section id="customer-auth" class="customer-auth-flow">
+      <!-- Customer Hero Banner matching staff-banner -->
+      <section id="customer-banner" class="staff-banner customer-banner">
+        <p id="customer-banner-eyebrow" class="eyebrow" data-software-name>TRIMTIME FOR CUSTOMERS</p>
+        <h1 id="customer-banner-title">Skip the waiting room. Live queues & appointments.</h1>
+        <p id="customer-banner-message">Follow your turn from anywhere, book preferred barbers, and get styled right on time.</p>
+      </section>
+
+      <!-- Centered Segmented Auth Tabs matching staff-auth-tabs-wrap -->
+      <div class="customer-auth-tabs-wrap" id="customer-auth-tabs-wrap">
+        <div class="customer-auth-tabs" role="tablist" aria-label="Customer sign in or sign up">
+          <button type="button" id="auth-tab-signin" class="customer-tab-btn active" role="tab" aria-selected="true">Customer Sign In</button>
+          <button type="button" id="auth-tab-signup" class="customer-tab-btn" role="tab" aria-selected="false">New Customer? Sign Up</button>
         </div>
       </div>
-      <div class="panel customer-auth-card">
-        <div class="auth-mode-tabs" role="tablist" aria-label="Customer sign in or sign up">
-          <button type="button" id="auth-tab-signin" class="auth-tab-btn active" role="tab" aria-selected="true">Sign In</button>
-          <button type="button" id="auth-tab-signup" class="auth-tab-btn" role="tab" aria-selected="false">New Customer? Sign Up</button>
-        </div>
 
-        <div id="otp-request-step">
-          <p id="customer-auth-eyebrow" class="eyebrow">CUSTOMER ACCESS</p>
-          <h2 id="customer-auth-title">Sign in with email</h2>
-          <p id="customer-auth-copy" class="muted">Enter your registered email address to receive a secure OTP code. You only need to verify once on this device.</p>
-          <form id="otp-request-form" class="single-column-form" action="javascript:void(0);">
-            <label>Email address
-              <input id="customer-identifier" type="email" autocomplete="email" placeholder="you@example.com" required />
-            </label>
-            <button id="send-otp-button">Send verification code <span>→</span></button>
-          </form>
-          <p class="auth-switch-note muted">New to TrimTime? <button type="button" id="switch-to-signup-link" class="auth-text-link">Create a customer account</button></p>
-        </div>
-
-        <div id="customer-signup-step" class="hidden">
-          <p class="eyebrow">NEW CUSTOMER REGISTRATION</p>
-          <h2>Create your customer account</h2>
-          <p class="muted">Fill in your details below to register, track live queues, and book appointments.</p>
-          <form id="customer-signup-form" class="single-column-form" action="javascript:void(0);">
-            <label>Your full name <span style="color:#dc2626;">*</span>
-              <input id="signup-name" minlength="2" maxlength="100" autocomplete="name" placeholder="Full name" required />
-            </label>
-            <label>Email address <span style="color:#dc2626;">*</span>
-              <input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com" required />
-            </label>
-            <div class="form-row-2">
-              <label>Age <span style="color:#dc2626;">*</span>
-                <input id="signup-age" type="number" min="5" max="110" placeholder="e.g. 26" required />
+      <!-- 2-Column Sign In Layout matching staff login-panel -->
+      <section id="customer-signin-panel" class="auth-layout">
+        <div class="panel signin-card customer-auth-card">
+          <!-- Step 1: MPIN Login (for returning trusted device) -->
+          <div id="customer-mpin-step" class="hidden">
+            <p class="eyebrow">FAST SIGN IN</p>
+            <h2 id="customer-mpin-title">Sign in with MPIN</h2>
+            <div id="customer-saved-device-banner" class="saved-device-banner hidden">
+              <span id="customer-saved-email-badge"></span>
+              <button type="button" id="switch-account-btn" class="switch-account-btn">Use another email</button>
+            </div>
+            <p id="customer-mpin-copy" class="muted">Enter your 6-digit MPIN to sign in quickly on this trusted device.</p>
+            <form id="customer-mpin-form" class="single-column-form" action="javascript:void(0);">
+              <label>6-digit MPIN
+                <input id="customer-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" required />
               </label>
-              <label>Gender <span style="color:#dc2626;">*</span>
-                <select id="signup-gender" required>
+              <label id="customer-confirm-mpin-label" class="hidden">Confirm MPIN
+                <input id="customer-confirm-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" />
+              </label>
+              <button id="customer-mpin-submit" type="submit">Sign in <span>→</span></button>
+            </form>
+            <div class="otp-actions-row">
+              <button id="forgot-customer-mpin" class="forgot-link" type="button">Sign in with Email OTP instead</button>
+              <button id="mpin-to-signup-link" class="forgot-link" type="button">New customer? Sign up</button>
+            </div>
+          </div>
+
+          <!-- Step 2: Email OTP Request -->
+          <div id="otp-request-step">
+            <p id="customer-auth-eyebrow" class="eyebrow">CUSTOMER ACCESS</p>
+            <h2 id="customer-auth-title">Customer sign in</h2>
+            <p id="customer-auth-copy" class="muted">Enter your registered email address to receive a secure OTP code. You only need to verify once on this device.</p>
+            <form id="otp-request-form" class="single-column-form" action="javascript:void(0);">
+              <label>Email address
+                <input id="customer-identifier" type="email" autocomplete="email" placeholder="you@example.com" required />
+              </label>
+              <button id="send-otp-button" type="submit">Send verification code <span>→</span></button>
+            </form>
+            <p class="auth-switch-note muted">New to TrimTime? <button type="button" id="switch-to-signup-link" class="auth-text-link">Create a customer account</button></p>
+          </div>
+
+          <!-- Step 3: Email OTP Verify -->
+          <div id="otp-verify-step" class="hidden">
+            <p class="eyebrow">VERIFY EMAIL</p>
+            <h2>Enter verification OTP</h2>
+            <div id="otp-dev-helper" class="otp-dev-banner hidden"></div>
+            <p id="otp-message" class="muted"></p>
+            <form id="otp-verify-form" class="single-column-form" action="javascript:void(0);">
+              <label>6-digit OTP code
+                <input id="customer-otp" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="123456" required />
+              </label>
+              <button id="verify-otp-submit-btn" type="submit">Verify and continue <span>→</span></button>
+            </form>
+            <div class="otp-actions-row">
+              <button id="resend-customer-otp" class="forgot-link" type="button">Resend OTP</button>
+              <button id="otp-back-btn" class="forgot-link" type="button">← Change email / edit details</button>
+            </div>
+          </div>
+
+          <!-- Step 4: Customer Profile Step (if needed) -->
+          <div id="customer-profile-step" class="hidden">
+            <p class="eyebrow">WELCOME TO TRIMTIME</p>
+            <h2>Complete your profile</h2>
+            <div id="customer-profile-ad" class="profile-ad-image"></div>
+            <form id="customer-profile-form" class="single-column-form" action="javascript:void(0);">
+              <label>Your full name
+                <input id="verified-customer-name" minlength="2" autocomplete="name" placeholder="Full name" required />
+              </label>
+              <label>Age
+                <input id="verified-customer-age" type="number" min="5" max="110" placeholder="e.g. 26" required />
+              </label>
+              <label>Gender
+                <select id="verified-customer-gender" required>
                   <option value="">Select gender</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -67,52 +112,52 @@
                   <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
               </label>
-            </div>
-            <label>Mobile number (optional)
-              <input id="signup-phone" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number (optional)" />
-            </label>
-            <label>6-digit MPIN for fast login (optional)
-              <input id="signup-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" />
-            </label>
-            <label class="terms-check">
-              <input id="signup-terms" type="checkbox" required />
-              <span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span>
-            </label>
-            <button type="submit" id="signup-submit-btn">Create account & continue <span>→</span></button>
-          </form>
-          <p class="auth-switch-note muted">Already have an account? <button type="button" id="switch-to-signin-link" class="auth-text-link">Sign in here</button></p>
-        </div>
-
-        <div id="otp-verify-step" class="hidden">
-          <p class="eyebrow">VERIFY EMAIL</p>
-          <h2>Enter verification OTP</h2>
-          <div id="otp-dev-helper" class="otp-dev-banner hidden"></div>
-          <p id="otp-message" class="muted"></p>
-          <form id="otp-verify-form" class="single-column-form" action="javascript:void(0);">
-            <label>6-digit OTP code
-              <input id="customer-otp" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="123456" required />
-            </label>
-            <button id="verify-otp-submit-btn">Verify and continue <span>→</span></button>
-          </form>
-          <div class="otp-actions-row">
-            <button id="resend-customer-otp" class="forgot-link" type="button">Resend OTP</button>
-            <button id="otp-back-btn" class="forgot-link" type="button">← Change email / edit details</button>
+              <label class="terms-check">
+                <input id="customer-terms" type="checkbox" required />
+                <span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span>
+              </label>
+              <button type="submit">Complete registration <span>→</span></button>
+            </form>
           </div>
+
+          <p id="customer-auth-error" class="error" role="alert"></p>
+          <p id="customer-auth-status" class="success" role="status"></p>
         </div>
 
-        <div id="customer-profile-step" class="hidden">
-          <p class="eyebrow">WELCOME TO TRIMTIME</p>
-          <h2>Complete your profile</h2>
-          <div id="customer-profile-ad" class="profile-ad-image"></div>
-          <form id="customer-profile-form" class="single-column-form" action="javascript:void(0);">
-            <label>Your full name
-              <input id="verified-customer-name" minlength="2" autocomplete="name" placeholder="Full name" required />
+        <!-- Right Side Promo Card matching staff.html register-promo -->
+        <aside class="panel register-promo customer-register-promo">
+          <div>
+            <p class="eyebrow">NEW CUSTOMER</p>
+            <h2>Skip the waiting room. Always on time.</h2>
+            <p class="muted">Create your profile once to join live queues, track your place in real time, book appointments with preferred stylists, and sign in with a single tap.</p>
+            <button type="button" id="promo-show-signup" class="secondary">Register as new customer</button>
+          </div>
+          <div id="customer-promo-image" class="register-promo-image customer-promo-image" role="img" aria-label="Customer queue experience"></div>
+        </aside>
+      </section>
+
+      <!-- Full Registration Panel matching registration-panel in staff.html -->
+      <section id="customer-signup-step" class="panel customer-signup-panel hidden">
+        <div class="signup-panel-header">
+          <p class="eyebrow">NEW CUSTOMER REGISTRATION</p>
+          <h2>Create your customer account</h2>
+          <p class="muted">Fill in your details below to track live queues, book appointments, and sign in effortlessly.</p>
+        </div>
+        <form id="customer-signup-form" class="customer-registration-form" action="javascript:void(0);">
+          <div class="form-row-2">
+            <label>Your full name <span class="mandatory-star">*</span>
+              <input id="signup-name" minlength="2" maxlength="100" autocomplete="name" placeholder="Full name" required />
             </label>
-            <label>Age
-              <input id="verified-customer-age" type="number" min="5" max="110" placeholder="e.g. 26" required />
+            <label>Email address <span class="mandatory-star">*</span>
+              <input id="signup-email" type="email" autocomplete="email" placeholder="you@example.com" required />
             </label>
-            <label>Gender
-              <select id="verified-customer-gender" required>
+          </div>
+          <div class="form-row-2">
+            <label>Age <span class="mandatory-star">*</span>
+              <input id="signup-age" type="number" min="5" max="110" placeholder="e.g. 26" required />
+            </label>
+            <label>Gender <span class="mandatory-star">*</span>
+              <select id="signup-gender" required>
                 <option value="">Select gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -120,40 +165,29 @@
                 <option value="prefer_not_to_say">Prefer not to say</option>
               </select>
             </label>
-            <label class="terms-check">
-              <input id="customer-terms" type="checkbox" required />
-              <span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span>
-            </label>
-            <button>Complete registration <span>→</span></button>
-          </form>
-        </div>
-
-        <div id="customer-mpin-step" class="hidden">
-          <p class="eyebrow">FAST SIGN IN</p>
-          <h2 id="customer-mpin-title">Enter your 6-digit MPIN</h2>
-          <div id="customer-saved-device-banner" class="saved-device-banner hidden">
-            <span id="customer-saved-email-badge"></span>
-            <button type="button" id="switch-account-btn" class="switch-account-btn">Use another email</button>
           </div>
-          <p id="customer-mpin-copy" class="muted">Enter your MPIN to sign in quickly on this trusted device.</p>
-          <form id="customer-mpin-form" class="single-column-form" action="javascript:void(0);">
-            <label>6-digit MPIN
-              <input id="customer-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" required />
+          <div class="form-row-2">
+            <label>Mobile number (optional)
+              <input id="signup-phone" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile number" />
             </label>
-            <label id="customer-confirm-mpin-label">Confirm MPIN
-              <input id="customer-confirm-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" />
+            <label>6-digit MPIN for fast login (optional)
+              <input id="signup-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="••••••" />
             </label>
-            <button id="customer-mpin-submit">Sign in <span>→</span></button>
-          </form>
-          <div class="otp-actions-row">
-            <button id="forgot-customer-mpin" class="forgot-link" type="button">Sign in with Email OTP instead</button>
-            <button id="mpin-to-signup-link" class="forgot-link" type="button">New customer? Sign up</button>
           </div>
+          <label class="terms-check">
+            <input id="signup-terms" type="checkbox" required />
+            <span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span>
+          </label>
+          <div class="signup-actions-row">
+            <button type="submit" id="signup-submit-btn" class="signup-submit-btn">Create account & continue <span>→</span></button>
+          </div>
+          <p id="customer-signup-error" class="error" role="alert"></p>
+          <p id="customer-signup-status" class="success" role="status"></p>
+        </form>
+        <div class="auth-link-row" style="margin-top: 20px;">
+          <button type="button" id="signup-back-to-signin" class="ghost">← Back to sign in</button>
         </div>
-
-        <p id="customer-auth-error" class="error" role="alert"></p>
-        <p id="customer-auth-status" class="success" role="status"></p>
-      </div>
+      </section>
     </section>
 
     <main id="customer-app" class="hidden">
@@ -360,7 +394,7 @@
 
     <footer>Built for calmer shops and better cuts.</footer>
     <script src="/static/branding.js?v=1" defer></script>
-    <script src="/static/app.js?v=93" defer></script>
+    <script src="/static/app.js?v=95" defer></script>
   </body>
 </html>
 

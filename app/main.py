@@ -100,7 +100,7 @@ def verify_mpin(account: CustomerUser | StaffUser, mpin: str, db: Session) -> No
 
 
 def staff_session(user: StaffUser) -> dict:
-    return {"access_token": create_access_token(user), "shop_id": user.shop_id, "staff_name": user.name, "is_platform_admin": user.is_platform_admin, "must_change_password": user.must_change_password, "role": user.role, "barber_id": user.barber_id, "requires_mpin_setup": not user.is_platform_admin and not bool(user.mpin_hash)}
+    return {"access_token": create_access_token(user), "shop_id": user.shop_id, "staff_name": user.name, "is_platform_admin": user.is_platform_admin, "must_change_password": user.must_change_password, "role": user.role, "barber_id": user.barber_id, "requires_mpin_setup": not bool(user.mpin_hash)}
 
 
 def banner_value(db: Session) -> dict:
@@ -506,7 +506,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This staff account is inactive. Contact your shop owner or administrator.")
-    if payload.device_id and user.mpin_hash and not user.is_platform_admin:
+    if payload.device_id and user.mpin_hash:
         remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=user.id)
         db.commit()
     return staff_session(user)
@@ -516,15 +516,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 def check_staff_device(payload: DeviceCheckRequest, db: Session = Depends(get_db)):
     identifier = payload.identifier.strip().lower()
     user = db.scalar(select(StaffUser).where(StaffUser.email == identifier)) if "@" in identifier else db.scalar(select(StaffUser).where(StaffUser.phone == normalize_phone(identifier)))
-    enabled = bool(user and user.is_active and not user.is_platform_admin and user.mpin_hash and trusted_device(db, device_id=payload.device_id, staff_user_id=user.id))
-    return {"mpin_login": enabled}
+    enabled = bool(user and user.is_active and user.mpin_hash and trusted_device(db, device_id=payload.device_id, staff_user_id=user.id))
+    return {
+        "mpin_login": enabled,
+        "name": user.name if (enabled and user) else None,
+        "identifier": (user.email or user.phone) if (enabled and user) else None,
+    }
 
 
 @app.post("/api/auth/login-mpin", response_model=TokenOut)
 def staff_mpin_login(payload: MpinLoginRequest, db: Session = Depends(get_db)):
     identifier = payload.identifier.strip().lower()
     user = db.scalar(select(StaffUser).where(StaffUser.email == identifier)) if "@" in identifier else db.scalar(select(StaffUser).where(StaffUser.phone == normalize_phone(identifier)))
-    if user is None or not user.is_active or user.is_platform_admin:
+    if user is None or not user.is_active or not user.mpin_hash:
         raise HTTPException(status_code=401, detail="MPIN sign-in is not available for this account")
     device = trusted_device(db, device_id=payload.device_id, staff_user_id=user.id)
     if device is None:
@@ -556,7 +560,7 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="No staff account is registered with this Google email")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This staff account is inactive")
-    if payload.device_id and user.mpin_hash and not user.is_platform_admin:
+    if payload.device_id and user.mpin_hash:
         remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=user.id)
         db.commit()
     return staff_session(user)
@@ -972,8 +976,6 @@ def change_password(payload: PasswordChange, staff: StaffUser = Depends(current_
 
 @app.post("/api/auth/set-mpin")
 def set_staff_mpin(payload: MpinSetRequest, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
-    if staff.is_platform_admin:
-        raise HTTPException(status_code=403, detail="Platform administrators must use password or Google sign-in")
     if payload.mpin != payload.confirm_mpin:
         raise HTTPException(status_code=422, detail="MPIN and confirmation do not match")
     if weak_mpin(payload.mpin):

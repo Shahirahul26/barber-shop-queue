@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><link rel="stylesheet" href="/static/styles.css?v=72" /><title>TrimTime · Staff dashboard</title></head>
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" /><link rel="stylesheet" href="/static/styles.css?v=90" /><title>TrimTime · Staff dashboard</title></head>
 <body class="staff-page">
   <header class="topbar"><a class="brand" href="/">TRIM<span>TIME</span></a><a href="/customer">Customer view</a></header>
   <main class="staff-main">
@@ -11,15 +11,66 @@
         <button type="button" id="tab-staff-register" class="staff-tab-btn" role="tab" aria-selected="false">Register New Barber Shop</button>
       </div>
     </div>
-    <section id="login-panel" class="auth-layout"><div class="panel signin-card"><h2>Staff sign in</h2><form id="login-form"><label>Email or phone number<input id="email" type="text" autocomplete="username" required /></label><label>Password<input id="password" type="password" minlength="8" autocomplete="current-password" required /></label><button type="submit">Sign in</button></form><div class="auth-link-row"><button type="button" id="show-mpin-login" class="forgot-link">Use MPIN</button><button type="button" id="show-forgot-password" class="forgot-link">Forgot password?</button></div><div id="google-login-area" class="google-login-area hidden"><div class="auth-divider"><span>or</span></div><div id="google-signin-button"></div></div><p id="google-login-note" class="muted small-note hidden"></p></div><aside class="panel register-promo"><div><p class="eyebrow">NEW SHOP</p><h2>Bring your barber shop online.</h2><p class="muted">Create your shop, team, services, QR code and live queue.</p><button type="button" id="show-registration" class="secondary">Register my barber shop</button></div><div id="register-promo-image" class="register-promo-image" role="img" aria-label="Barber shop registration"></div></aside></section>
+    <section id="login-panel" class="auth-layout">
+      <div class="panel signin-card">
+        <!-- Fast MPIN Step for returning staff on trusted device -->
+        <div id="staff-mpin-step" class="hidden">
+          <p class="eyebrow">FAST SIGN IN</p>
+          <h2 id="staff-mpin-title">Sign in with MPIN</h2>
+          <div id="staff-saved-device-banner" class="saved-device-banner hidden">
+            <span id="staff-saved-email-badge"></span>
+            <button type="button" id="staff-switch-account-btn" class="switch-account-btn">Use password</button>
+          </div>
+          <p id="staff-mpin-copy" class="muted">Enter your 6-digit MPIN to sign in on this trusted device.</p>
+          <form id="staff-fast-mpin-form" class="single-column-form" action="javascript:void(0);">
+            <label>6-digit MPIN
+              <input id="staff-fast-login-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="••••••" required />
+            </label>
+            <button id="staff-fast-mpin-submit" type="submit" class="auth-primary-submit">Sign in <span>→</span></button>
+          </form>
+          <div class="auth-link-row">
+            <button type="button" class="forgot-link back-to-password-login">Sign in with password instead</button>
+            <button type="button" id="staff-fast-forgot-mpin" class="forgot-link">Forgot MPIN?</button>
+          </div>
+        </div>
+
+        <!-- Standard Password Login Step -->
+        <div id="staff-password-step">
+          <h2>Staff sign in</h2>
+          <form id="login-form">
+            <label>Email or phone number<input id="email" type="text" autocomplete="username" required /></label>
+            <label>Password<input id="password" type="password" minlength="8" autocomplete="current-password" required /></label>
+            <button type="submit">Sign in</button>
+          </form>
+          <div class="auth-link-row">
+            <button type="button" id="show-mpin-login" class="forgot-link">Use MPIN</button>
+            <button type="button" id="show-forgot-password" class="forgot-link">Forgot password?</button>
+          </div>
+          <div id="google-login-area" class="google-login-area hidden">
+            <div class="auth-divider"><span>or</span></div>
+            <div id="google-signin-button"></div>
+          </div>
+          <p id="google-login-note" class="muted small-note hidden"></p>
+        </div>
+      </div>
+      <aside class="panel register-promo">
+        <div>
+          <p class="eyebrow">NEW SHOP</p>
+          <h2>Bring your barber shop online.</h2>
+          <p class="muted">Create your shop, team, services, QR code and live queue.</p>
+          <button type="button" id="show-registration" class="secondary">Register my barber shop</button>
+        </div>
+        <div id="register-promo-image" class="register-promo-image" role="img" aria-label="Barber shop registration"></div>
+      </aside>
+    </section>
     <section id="staff-mpin-login-panel" class="panel auth-narrow hidden"><p class="eyebrow">TRUSTED DEVICE</p><h2>Sign in with MPIN</h2><form id="staff-mpin-login-form"><label>Email or phone number<input id="staff-mpin-identifier" autocomplete="username" required /></label><label>6-digit MPIN<input id="staff-login-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required /></label><button>Sign in</button></form><div class="auth-link-row"><button type="button" class="forgot-link back-to-login">Use password</button><button type="button" id="staff-forgot-mpin" class="forgot-link">Forgot MPIN?</button></div></section>
     <section id="staff-mpin-setup-panel" class="panel auth-narrow hidden"><p class="eyebrow">SECURE YOUR ACCOUNT</p><h2>Create your 6-digit MPIN</h2><p class="muted">This device will remain trusted for 90 days.</p><form id="staff-mpin-setup-form"><label>New MPIN<input id="staff-new-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required /></label><label>Confirm MPIN<input id="staff-confirm-mpin" class="mpin-input" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required /></label><button>Save MPIN and continue</button></form></section>
     <section id="forgot-password-panel" class="panel hidden"><h2>Forgot password</h2><p class="muted">Enter your registered email or phone number. We will send the reset link to your registered email.</p><form id="forgot-password-form"><label>Email or phone number<input id="forgot-identifier" required autocomplete="username" /></label><button type="submit">Send reset link</button></form><p id="forgot-result" class="success"></p><button type="button" class="ghost back-to-login">Back to sign in</button></section>
     <section id="reset-password-panel" class="panel hidden"><h2>Choose a new password</h2><form id="reset-password-form"><label>New password<input id="reset-new-password" type="password" minlength="8" autocomplete="new-password" required /></label><label>Confirm new password<input id="reset-confirm-password" type="password" minlength="8" autocomplete="new-password" required /></label><button type="submit">Reset password</button></form></section>
     <section id="registration-panel" class="panel hidden"><h2>Register your shop</h2><p class="muted">Create your shop page, owner login and unique customer QR.</p><form id="registration-form"><label>Shop name<input id="register-shop-name" minlength="2" required /></label><label>Phone<input id="register-phone" /></label><label>GST number (optional)<input id="register-gst" minlength="15" maxlength="15" pattern="[0-9A-Za-z]{15}" /></label><label>Address<input id="register-address" minlength="5" required /></label><div class="geo-helper-card"><div class="geo-helper-header"><div class="geo-helper-title"><span class="geo-icon">📍</span><strong>Shop Location & Navigation (Free Google Maps)</strong></div><p class="small-note muted">Coordinates allow customers to find your shop and navigate with turn-by-turn Google Maps directions. Don't know them? Use one of the free helpers below:</p></div><div class="geo-action-buttons"><button type="button" id="register-geo-detect" class="geo-btn primary-geo"><span>📍</span> Detect my current location</button><button type="button" id="register-geo-from-address" class="geo-btn secondary-geo"><span>🔍</span> Find from address</button><button type="button" id="register-open-gmaps" class="geo-btn outline-geo"><span>🗺️</span> Open Google Maps</button></div><div class="geo-paste-row"><input id="register-geo-paste" type="text" placeholder="Or paste Google Maps link or coordinates (e.g. 19.0760, 72.8777)" /><button type="button" id="register-geo-apply-paste" class="secondary">Apply</button></div><p id="register-geo-status" class="geo-status-msg" aria-live="polite"></p><div id="register-map-container" class="map-picker-wrap hidden"><div class="map-picker-header"><span>Click anywhere on the map or drag the pin to set coordinates:</span><button type="button" id="register-map-close" class="ghost small-btn">Close map</button></div><div id="register-map-view" class="map-picker-canvas"></div></div><button type="button" id="register-toggle-map" class="toggle-map-btn"><span>🗺️</span> Pick / adjust on interactive map</button></div><label>Latitude<input id="register-latitude" type="number" step="any" min="-90" max="90" /></label><label>Longitude<input id="register-longitude" type="number" step="any" min="-180" max="180" /></label><label>Your name<input id="register-owner-name" minlength="2" required /></label><label>Email<input id="register-email" type="email" required /></label><label>Password<input id="register-password" type="password" minlength="8" autocomplete="new-password" required /></label><label class="terms-check"><input id="register-terms" type="checkbox" required /><span>I have read and agree to the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a>.</span></label><button type="submit">Create shop and sign in</button></form><button type="button" id="back-to-login" class="ghost">Back to sign in</button></section>
     <div id="dashboard" class="hidden">
-      <div class="dashboard-nav-wrap"><nav class="dashboard-nav" aria-label="Staff dashboard sections"><button type="button" data-tab="queue" class="active"><span id="queue-nav-count" aria-label="Current queue count">0</span>Live queue</button><button type="button" data-tab="appointments"><span id="appointment-nav-count" aria-label="Appointment count">0</span>Appointments</button><button type="button" data-tab="walkin"><span class="nav-spacer" aria-hidden="true"></span>Generate token</button><button type="button" data-tab="account"><span class="nav-spacer" aria-hidden="true"></span>My account</button></nav>
-      <nav id="account-management-nav" class="account-menu hidden" aria-label="My account management"><button type="button" data-tab="services" class="manager-only">Services</button><button type="button" data-tab="team" class="manager-only">Team & staff</button><button type="button" data-tab="analytics">Analytics</button><button type="button" data-tab="settings">Settings</button><button type="button" data-tab="shop" class="manager-only">Shop details & QR</button><button type="button" id="logout" class="account-logout">Log out</button></nav></div>
+      <div class="dashboard-nav-wrap"><nav class="dashboard-nav" aria-label="Staff dashboard sections"><button type="button" data-tab="queue" class="active dashboard-nav-btn"><span id="queue-nav-count" aria-label="Current queue count">0</span>Live queue</button><button type="button" data-tab="appointments" class="dashboard-nav-btn"><span id="appointment-nav-count" aria-label="Appointment count">0</span>Appointments</button><button type="button" data-tab="walkin" class="dashboard-nav-btn"><span class="nav-spacer" aria-hidden="true"></span>Generate token</button><button type="button" data-tab="account" class="dashboard-nav-btn"><span class="nav-spacer" aria-hidden="true"></span>My account</button></nav>
+      <nav id="account-management-nav" class="account-menu hidden" aria-label="My account management"><button type="button" data-tab="services" class="manager-only account-menu-btn">Services</button><button type="button" data-tab="team" class="manager-only account-menu-btn">Team & staff</button><button type="button" data-tab="analytics" class="account-menu-btn">Analytics</button><button type="button" data-tab="settings" class="account-menu-btn">Settings</button><button type="button" data-tab="shop" class="manager-only account-menu-btn">Shop details & QR</button><button type="button" id="logout" class="account-logout account-menu-btn">Log out</button></nav></div>
       <section id="tab-queue" class="tab-section">
         <div class="panel toolbar">
           <button id="pause-queue" class="secondary">Pause new joins</button>
@@ -94,6 +145,6 @@
   </main>
   <script src="/static/branding.js?v=1" defer></script><script id="google-identity-script" src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
-  <script src="/static/staff.js?v=72" defer></script>
+  <script src="/static/staff.js?v=90" defer></script>
 </body>
 </html>

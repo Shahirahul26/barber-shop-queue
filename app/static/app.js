@@ -74,7 +74,9 @@ let currentCustomerAuthMode = customerAuthMode === "signup" ? "signup" : "signin
 let pendingSignupProfile = null;
 
 function showOtpRequestSignIn() {
-  ["#customer-signup-step", "#customer-mpin-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+  document.querySelector("#customer-signup-step")?.classList.add("hidden");
+  document.querySelector("#customer-signin-panel")?.classList.remove("hidden");
+  ["#customer-mpin-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
   document.querySelector("#otp-request-step")?.classList.remove("hidden");
 
   const eyebrow = document.querySelector("#customer-auth-eyebrow");
@@ -83,7 +85,7 @@ function showOtpRequestSignIn() {
   const submitBtn = document.querySelector("#send-otp-button");
 
   if (eyebrow) eyebrow.textContent = "CUSTOMER ACCESS";
-  if (title) title.textContent = "Sign in with email";
+  if (title) title.textContent = "Customer sign in";
   if (copy) copy.textContent = "Enter your registered email address to receive a secure OTP code. You only need to verify once on this device.";
   if (submitBtn) submitBtn.innerHTML = "Send verification code <span>→</span>";
 
@@ -93,25 +95,30 @@ function showOtpRequestSignIn() {
 
 function setCustomerAuthMode(mode) {
   currentCustomerAuthMode = mode;
-  document.querySelector("#auth-tab-signin")?.classList.toggle("active", mode === "signin");
-  document.querySelector("#auth-tab-signup")?.classList.toggle("active", mode === "signup");
-  document.querySelector("#auth-tab-signin")?.setAttribute("aria-selected", String(mode === "signin"));
-  document.querySelector("#auth-tab-signup")?.setAttribute("aria-selected", String(mode === "signup"));
+  const signinTab = document.querySelector("#auth-tab-signin");
+  const signupTab = document.querySelector("#auth-tab-signup");
+  signinTab?.classList.toggle("active", mode === "signin");
+  signupTab?.classList.toggle("active", mode === "signup");
+  signinTab?.setAttribute("aria-selected", String(mode === "signin"));
+  signupTab?.setAttribute("aria-selected", String(mode === "signup"));
 
   const errorEl = document.querySelector("#customer-auth-error");
   if (errorEl) errorEl.textContent = "";
   const statusEl = document.querySelector("#customer-auth-status");
   if (statusEl) statusEl.textContent = "";
+  const signupError = document.querySelector("#customer-signup-error");
+  if (signupError) signupError.textContent = "";
 
   if (mode === "signup") {
-    // Open the new customer signup form directly
-    ["#otp-request-step", "#customer-mpin-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+    // Open the new customer signup panel directly (mirroring staff.html registration-panel)
+    document.querySelector("#customer-signin-panel")?.classList.add("hidden");
     document.querySelector("#customer-signup-step")?.classList.remove("hidden");
     const nameInput = document.querySelector("#signup-name");
     if (nameInput) nameInput.focus();
   } else {
     // Sign In Mode: Check if device has saved email with MPIN
-    ["#customer-signup-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+    document.querySelector("#customer-signup-step")?.classList.add("hidden");
+    document.querySelector("#customer-signin-panel")?.classList.remove("hidden");
     const savedEmail = localStorage.getItem("trimtimeCustomerEmail");
     if (savedEmail && customerDeviceId) {
       fetch("/api/customer-auth/check-device", {
@@ -136,6 +143,8 @@ function setCustomerAuthMode(mode) {
 
 document.querySelector("#auth-tab-signin")?.addEventListener("click", () => setCustomerAuthMode("signin"));
 document.querySelector("#auth-tab-signup")?.addEventListener("click", () => setCustomerAuthMode("signup"));
+document.querySelector("#promo-show-signup")?.addEventListener("click", () => setCustomerAuthMode("signup"));
+document.querySelector("#signup-back-to-signin")?.addEventListener("click", () => setCustomerAuthMode("signin"));
 document.querySelector("#switch-to-signup-link")?.addEventListener("click", () => setCustomerAuthMode("signup"));
 document.querySelector("#switch-to-signin-link")?.addEventListener("click", () => setCustomerAuthMode("signin"));
 document.querySelector("#mpin-to-signup-link")?.addEventListener("click", () => setCustomerAuthMode("signup"));
@@ -162,7 +171,12 @@ function showCustomerApp(customer) {
     ticketPanel.classList.add("hidden"); document.querySelector("#appointment-ticket-panel").classList.add("hidden");
   }
   localStorage.setItem("trimtimeCustomerOwnerId", String(customer.id));
-  document.querySelector("#customer-auth").classList.add("hidden"); document.querySelector("#customer-app").classList.remove("hidden");
+  document.querySelector("#customer-auth")?.classList.add("hidden");
+  document.querySelector("#customer-banner")?.classList.add("hidden");
+  document.querySelector("#customer-auth-tabs-wrap")?.classList.add("hidden");
+  document.querySelector("#customer-signin-panel")?.classList.add("hidden");
+  document.querySelector("#customer-signup-step")?.classList.add("hidden");
+  document.querySelector("#customer-app")?.classList.remove("hidden");
   document.querySelector("#show-customer-profile").classList.remove("hidden");
   document.querySelector("#customer-name").value = customer.name || ""; if (customer.phone) document.querySelector("#phone").value = customer.phone;
   document.querySelector("#profile-name").textContent = customer.name || "Not provided";
@@ -351,7 +365,9 @@ async function requestOtp(identifier, resetMpin = false) {
   firstTimeCustomer = body.first_time;
   pendingIdentifier = cleanEmail;
 
-  ["#otp-request-step", "#customer-signup-step", "#customer-mpin-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+  document.querySelector("#customer-signup-step")?.classList.add("hidden");
+  document.querySelector("#customer-signin-panel")?.classList.remove("hidden");
+  ["#otp-request-step", "#customer-mpin-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
   document.querySelector("#otp-verify-step")?.classList.remove("hidden");
 
   let msg = body.message || `Verification code sent to ${cleanEmail}. Check your inbox.`;
@@ -374,7 +390,9 @@ async function requestOtp(identifier, resetMpin = false) {
 
 function showCustomerMpin(mode, accountName = null) {
   customerMpinMode = mode;
-  ["#otp-request-step", "#customer-signup-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
+  document.querySelector("#customer-signup-step")?.classList.add("hidden");
+  document.querySelector("#customer-signin-panel")?.classList.remove("hidden");
+  ["#otp-request-step", "#otp-verify-step", "#customer-profile-step"].forEach((id) => document.querySelector(id)?.classList.add("hidden"));
   document.querySelector("#customer-mpin-step")?.classList.remove("hidden");
   const enteringExisting = mode === "login" || mode === "verify", needsConfirm = mode === "setup";
   const titleEl = document.querySelector("#customer-mpin-title");
@@ -449,7 +467,9 @@ document.querySelector("#otp-request-form")?.addEventListener("submit", async (e
 document.querySelector("#customer-signup-form")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const authError = document.querySelector("#customer-auth-error");
+  const signupError = document.querySelector("#customer-signup-error");
   if (authError) authError.textContent = "";
+  if (signupError) signupError.textContent = "";
   const statusEl = document.querySelector("#customer-auth-status");
   if (statusEl) statusEl.textContent = "";
 
@@ -462,11 +482,15 @@ document.querySelector("#customer-signup-form")?.addEventListener("submit", asyn
   const termsAccepted = document.querySelector("#signup-terms")?.checked;
 
   if (!name || !email || !age || !gender || !termsAccepted) {
-    if (authError) authError.textContent = "Please fill in all required fields and accept the Terms & Conditions.";
+    const msg = "Please fill in all required fields and accept the Terms & Conditions.";
+    if (authError) authError.textContent = msg;
+    if (signupError) signupError.textContent = msg;
     return;
   }
   if (mpin && !/^[0-9]{6}$/.test(mpin)) {
-    if (authError) authError.textContent = "MPIN must be exactly 6 digits.";
+    const msg = "MPIN must be exactly 6 digits.";
+    if (authError) authError.textContent = msg;
+    if (signupError) signupError.textContent = msg;
     return;
   }
 
@@ -477,6 +501,7 @@ document.querySelector("#customer-signup-form")?.addEventListener("submit", asyn
     await requestOtp(email);
   } catch (reason) {
     if (authError) authError.textContent = reason.message;
+    if (signupError) signupError.textContent = reason.message;
   }
 });
 

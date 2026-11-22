@@ -359,6 +359,10 @@ function acceptSession(session, identifier = "") {
   requiresMpinSetup = Boolean(session.requires_mpin_setup);
   accessToken = session.access_token; shopId = session.shop_id; staffRole = session.role; staffBarberId = session.barber_id;
   sessionStorage.setItem("trimtimeStaffToken", accessToken); sessionStorage.setItem("trimtimeShopId", shopId); sessionStorage.setItem("trimtimeStaffRole", staffRole); sessionStorage.setItem("trimtimeBarberId", staffBarberId || ""); sessionStorage.setItem("trimtimeLoginIdentifier", identifier);
+  const savedIdentifier = identifier || session.staff_email || session.identifier;
+  if (savedIdentifier) {
+    localStorage.setItem("trimtimeStaffIdentifier", savedIdentifier);
+  }
   if (session.requires_mpin_setup && !session.must_change_password) { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#staff-mpin-setup-panel").classList.remove("hidden"); return; }
   showBoard();
   if (session.must_change_password) { document.querySelector('[data-tab="settings"]').click(); document.querySelector("#password-notice").textContent = "Your administrator issued a temporary password. Change it now before continuing."; error.textContent = "Please change your temporary password."; }
@@ -394,34 +398,181 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
   finally { button.disabled = false; button.textContent = "Sign in"; }
 });
 
-document.querySelector("#show-registration").addEventListener("click", () => {
-  document.querySelector("#login-panel").classList.add("hidden");
-  document.querySelector("#registration-panel").classList.remove("hidden");
+document.querySelector("#show-registration")?.addEventListener("click", () => {
+  document.querySelector("#login-panel")?.classList.add("hidden");
+  document.querySelector("#registration-panel")?.classList.remove("hidden");
   document.querySelector("#tab-staff-register")?.classList.add("active");
   document.querySelector("#tab-staff-signin")?.classList.remove("active");
+  document.querySelector("#tab-staff-register")?.setAttribute("aria-selected", "true");
+  document.querySelector("#tab-staff-signin")?.setAttribute("aria-selected", "false");
+  error.textContent = "";
 });
-document.querySelector("#back-to-login").addEventListener("click", () => {
-  document.querySelector("#registration-panel").classList.add("hidden");
-  document.querySelector("#login-panel").classList.remove("hidden");
+document.querySelector("#back-to-login")?.addEventListener("click", () => {
+  document.querySelector("#registration-panel")?.classList.add("hidden");
+  document.querySelector("#login-panel")?.classList.remove("hidden");
   document.querySelector("#tab-staff-signin")?.classList.add("active");
   document.querySelector("#tab-staff-register")?.classList.remove("active");
+  document.querySelector("#tab-staff-signin")?.setAttribute("aria-selected", "true");
+  document.querySelector("#tab-staff-register")?.setAttribute("aria-selected", "false");
+  error.textContent = "";
 });
+function showStaffMpinLogin(identifier, name = null) {
+  const mpinStep = document.querySelector("#staff-mpin-step");
+  const passwordStep = document.querySelector("#staff-password-step");
+  if (!mpinStep || !passwordStep) return;
+  mpinStep.classList.remove("hidden");
+  passwordStep.classList.add("hidden");
+  const title = document.querySelector("#staff-mpin-title");
+  if (title) {
+    title.textContent = name ? `Welcome back, ${name}!` : "Sign in with MPIN";
+  }
+  const badge = document.querySelector("#staff-saved-email-badge");
+  const banner = document.querySelector("#staff-saved-device-banner");
+  if (badge && banner) {
+    badge.textContent = identifier;
+    banner.classList.remove("hidden");
+  }
+  const input = document.querySelector("#staff-fast-login-mpin");
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 80);
+  }
+  error.textContent = "";
+}
+
+function showStaffPasswordLogin() {
+  const mpinStep = document.querySelector("#staff-mpin-step");
+  const passwordStep = document.querySelector("#staff-password-step");
+  if (mpinStep) mpinStep.classList.add("hidden");
+  if (passwordStep) passwordStep.classList.remove("hidden");
+  const savedIdentifier = localStorage.getItem("trimtimeStaffIdentifier");
+  const emailInput = document.querySelector("#email");
+  if (emailInput && savedIdentifier && !emailInput.value) {
+    emailInput.value = savedIdentifier;
+  }
+  const passwordInput = document.querySelector("#password");
+  if (passwordInput) setTimeout(() => passwordInput.focus(), 80);
+  error.textContent = "";
+}
+
+async function checkReturningStaffDevice() {
+  const savedIdentifier = localStorage.getItem("trimtimeStaffIdentifier");
+  if (!savedIdentifier || !staffDeviceId) return;
+  try {
+    const check = await fetch("/api/auth/check-device", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier: savedIdentifier, device_id: staffDeviceId })
+    }).then((r) => r.json()).catch(() => ({}));
+
+    if (check && check.mpin_login) {
+      showStaffMpinLogin(check.identifier || savedIdentifier, check.name || null);
+    }
+  } catch (err) {
+    console.warn("Staff device check error:", err);
+  }
+}
+
 document.querySelector("#tab-staff-signin")?.addEventListener("click", () => {
-  document.querySelector("#registration-panel").classList.add("hidden");
-  document.querySelector("#login-panel").classList.remove("hidden");
+  document.querySelector("#registration-panel")?.classList.add("hidden");
+  document.querySelector("#login-panel")?.classList.remove("hidden");
   document.querySelector("#tab-staff-signin")?.classList.add("active");
   document.querySelector("#tab-staff-register")?.classList.remove("active");
+  document.querySelector("#tab-staff-signin")?.setAttribute("aria-selected", "true");
+  document.querySelector("#tab-staff-register")?.setAttribute("aria-selected", "false");
+  error.textContent = "";
+  checkReturningStaffDevice();
 });
 document.querySelector("#tab-staff-register")?.addEventListener("click", () => {
-  document.querySelector("#login-panel").classList.add("hidden");
-  document.querySelector("#registration-panel").classList.remove("hidden");
+  document.querySelector("#login-panel")?.classList.add("hidden");
+  document.querySelector("#registration-panel")?.classList.remove("hidden");
   document.querySelector("#tab-staff-register")?.classList.add("active");
   document.querySelector("#tab-staff-signin")?.classList.remove("active");
+  document.querySelector("#tab-staff-register")?.setAttribute("aria-selected", "true");
+  document.querySelector("#tab-staff-signin")?.setAttribute("aria-selected", "false");
+  error.textContent = "";
 });
 if (!accessToken && new URLSearchParams(location.search).get("auth") === "signup") document.querySelector("#show-registration").click();
 document.querySelector("#show-forgot-password").addEventListener("click", () => { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#forgot-password-panel").classList.remove("hidden"); });
-document.querySelectorAll(".back-to-login").forEach((button) => button.addEventListener("click", () => { document.querySelector("#forgot-password-panel").classList.add("hidden"); document.querySelector("#staff-mpin-login-panel").classList.add("hidden"); document.querySelector("#login-panel").classList.remove("hidden"); }));
-document.querySelector("#show-mpin-login").addEventListener("click", () => { document.querySelector("#staff-mpin-identifier").value = document.querySelector("#email").value; document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#staff-mpin-login-panel").classList.remove("hidden"); });
+document.querySelectorAll(".back-to-login").forEach((button) => button.addEventListener("click", () => {
+  document.querySelector("#forgot-password-panel").classList.add("hidden");
+  document.querySelector("#staff-mpin-login-panel").classList.add("hidden");
+  document.querySelector("#login-panel").classList.remove("hidden");
+  showStaffPasswordLogin();
+}));
+
+document.querySelector("#staff-fast-mpin-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  error.textContent = "";
+  const submitBtn = document.querySelector("#staff-fast-mpin-submit");
+  const mpinInput = document.querySelector("#staff-fast-login-mpin");
+  const mpin = mpinInput?.value.trim() || "";
+  const identifier = localStorage.getItem("trimtimeStaffIdentifier") || document.querySelector("#staff-saved-email-badge")?.textContent.trim() || document.querySelector("#email")?.value.trim();
+
+  if (!identifier) {
+    error.textContent = "Identifier missing. Please sign in with password.";
+    showStaffPasswordLogin();
+    return;
+  }
+  if (mpin.length !== 6) {
+    error.textContent = "Please enter your 6-digit MPIN.";
+    return;
+  }
+
+  try {
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Signing in…"; }
+    const response = await fetch("/api/auth/login-mpin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identifier,
+        mpin,
+        device_id: staffDeviceId,
+        device_name: navigator.userAgent.slice(0, 160)
+      })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(formatApiError(body.detail));
+    acceptSession(body, identifier);
+  } catch (reason) {
+    error.textContent = reason.message;
+    if (mpinInput) {
+      mpinInput.value = "";
+      mpinInput.focus();
+    }
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Sign in →"; }
+  }
+});
+
+document.querySelector("#staff-switch-account-btn")?.addEventListener("click", showStaffPasswordLogin);
+document.querySelectorAll(".back-to-password-login").forEach((btn) => btn.addEventListener("click", showStaffPasswordLogin));
+document.querySelector("#staff-fast-forgot-mpin")?.addEventListener("click", () => {
+  const identifier = localStorage.getItem("trimtimeStaffIdentifier") || document.querySelector("#staff-saved-email-badge")?.textContent.trim();
+  document.querySelector("#login-panel").classList.add("hidden");
+  document.querySelector("#forgot-password-panel").classList.remove("hidden");
+  if (identifier) document.querySelector("#forgot-identifier").value = identifier;
+});
+
+document.querySelector("#show-mpin-login").addEventListener("click", async () => {
+  const typedId = document.querySelector("#email")?.value.trim() || localStorage.getItem("trimtimeStaffIdentifier");
+  if (typedId) {
+    try {
+      const check = await fetch("/api/auth/check-device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: typedId, device_id: staffDeviceId })
+      }).then((r) => r.json()).catch(() => ({}));
+      if (check && check.mpin_login) {
+        showStaffMpinLogin(typedId, check.name || null);
+        return;
+      }
+    } catch (_) {}
+  }
+  document.querySelector("#staff-mpin-identifier").value = typedId || "";
+  document.querySelector("#login-panel").classList.add("hidden");
+  document.querySelector("#staff-mpin-login-panel").classList.remove("hidden");
+});
 document.querySelector("#staff-forgot-mpin").addEventListener("click", () => { document.querySelector("#staff-mpin-login-panel").classList.add("hidden"); document.querySelector("#forgot-password-panel").classList.remove("hidden"); document.querySelector("#forgot-identifier").value = document.querySelector("#staff-mpin-identifier").value; });
 document.querySelector("#staff-mpin-login-form").addEventListener("submit", async (event) => { event.preventDefault(); error.textContent = ""; const identifier = document.querySelector("#staff-mpin-identifier").value.trim(); try { const response = await fetch("/api/auth/login-mpin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier, mpin: document.querySelector("#staff-login-mpin").value, device_id: staffDeviceId, device_name: navigator.userAgent.slice(0, 160) }) }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail)); document.querySelector("#staff-mpin-login-panel").classList.add("hidden"); acceptSession(body, identifier); } catch (reason) { error.textContent = reason.message; } });
 document.querySelector("#staff-mpin-setup-form").addEventListener("submit", async (event) => { event.preventDefault(); error.textContent = ""; const mpin = document.querySelector("#staff-new-mpin").value, confirm = document.querySelector("#staff-confirm-mpin").value; try { const response = await request("/api/auth/set-mpin", { method: "POST", body: JSON.stringify({ mpin, confirm_mpin: confirm, device_id: staffDeviceId, device_name: navigator.userAgent.slice(0, 160) }) }); document.querySelector("#staff-mpin-setup-panel").classList.add("hidden"); message(response.message); showBoard(); } catch (reason) { error.textContent = reason.message; } });
@@ -478,7 +629,10 @@ function logout() {
   resetDashboardTabs();
   document.querySelector("#login-panel").classList.remove("hidden");
   document.querySelector("#dashboard").classList.add("hidden");
+  document.querySelector("#staff-banner")?.classList.remove("hidden");
+  document.querySelector("#staff-auth-tabs-wrap")?.classList.remove("hidden");
   if (socket) socket.close();
+  checkReturningStaffDevice();
 }
 
 async function showBoard() {
@@ -645,8 +799,9 @@ function renderQueue(entries) {
     const selectedServiceIds = new Set(entry.service_ids || (entry.service_id ? [entry.service_id] : []));
     const serviceOptions = shop.services.map((service) => `<label><input type="checkbox" value="${service.id}" ${selectedServiceIds.has(service.id) ? "checked" : ""} ${staffRole === "barber" || entry.source === "appointment" ? "disabled" : ""} /><span>${escapeHtml(service.name)} <small>₹${service.price_rupees}</small></span></label>`).join("");
     const actions = entry.status === "waiting" ? `<button data-action="start">${staffRole === "barber" ? "Claim & start" : "Start"}</button>${staffRole === "barber" ? "" : '<button data-action="skip" class="secondary">Skip</button>'}` : entry.status === "serving" ? '<button data-action="complete">Mark done</button>' : '<button data-action="restore" class="secondary">Restore to queue</button>';
+    const fitsGapBadge = (entry.status === "waiting" && entry.source !== "appointment" && Number(entry.estimated_wait_minutes) === 0) ? '<span class="gap-fit-badge" title="Service fits in open gap before next appointment">⚡ Fits open chair gap</span>' : "";
     const position = entry.status === "serving" ? "In chair" : entry.availability_message || `${entry.people_ahead} ${entry.ahead_label || "people ahead"} · ~${entry.estimated_wait_minutes} min`;
-    card.innerHTML = `<div class="token">${entry.token}</div><div class="customer"><strong>${escapeHtml(entry.customer_name)}</strong><span>${escapeHtml(entry.service_name)} · ${entry.source === "appointment" ? "PRIORITY APPOINTMENT" : entry.source.replace("_", " ")}</span>${entry.email ? `<small>${escapeHtml(entry.email)}</small>` : ""}<div class="queue-assignment-controls"><div class="queue-assignment-control"><span class="control-caption">Choose services</span><details class="queue-service-picker"><summary>Select services</summary><div class="queue-service-checks">${serviceOptions}</div></details></div><div class="queue-assignment-control"><span class="control-caption">Assign barber</span><select class="barber-select" ${staffRole === "barber" ? "disabled" : ""}><option value="">Assign barber</option>${options}</select></div></div><p class="queue-card-error error" aria-live="polite"></p></div><div class="position">${position}</div><div class="actions">${actions}${staffRole === "barber" ? "" : '<button data-action="cancel" class="ghost">Cancel</button>'}</div>`;
+    card.innerHTML = `<div class="token">${entry.token}</div><div class="customer"><strong>${escapeHtml(entry.customer_name)}</strong><span>${escapeHtml(entry.service_name)} · ${entry.source === "appointment" ? "PRIORITY APPOINTMENT" : entry.source.replace("_", " ")}${fitsGapBadge}</span>${entry.email ? `<small>${escapeHtml(entry.email)}</small>` : ""}<div class="queue-assignment-controls"><div class="queue-assignment-control"><span class="control-caption">Choose services</span><details class="queue-service-picker"><summary>Select services</summary><div class="queue-service-checks">${serviceOptions}</div></details></div><div class="queue-assignment-control"><span class="control-caption">Assign barber</span><select class="barber-select" ${staffRole === "barber" ? "disabled" : ""}><option value="">Assign barber</option>${options}</select></div></div><p class="queue-card-error error" aria-live="polite"></p></div><div class="position">${position}</div><div class="actions">${actions}${staffRole === "barber" ? "" : '<button data-action="cancel" class="ghost">Cancel</button>'}</div>`;
     card.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => queueAction(entry.id, button.dataset.action, card.querySelector(".barber-select").value, [...card.querySelectorAll(".queue-service-checks input:checked")].map((input) => Number(input.value)), card))); list.append(card);
   });
 }
@@ -724,52 +879,64 @@ async function deleteBarber(id) {
   catch (reason) { error.textContent = reason.message; }
 }
 
-document.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
-  const target = button.dataset.tab;
-  const fromDashboardNav = Boolean(button.closest(".dashboard-nav"));
+let currentAccountSubTab = "services";
+
+function activateDashboardTab(target) {
   const managementTargets = ["services", "team", "analytics", "settings", "shop"];
   const canManage = ["owner", "manager"].includes(staffRole);
-  const dashboard = document.querySelector("#dashboard");
-  managementTargets.forEach((name) => dashboard.appendChild(document.querySelector(`#tab-${name}`)));
+
+  // Hide all sections first
   document.querySelectorAll(".tab-section").forEach((section) => section.classList.add("hidden"));
-  if (["queue", "appointments", "walkin"].includes(target)) {
-    document.querySelector("#barber-profile-panel")?.classList.add("hidden");
-  }
+  document.querySelector("#barber-profile-panel")?.classList.add("hidden");
+
+  let activeSubTab = null;
+
   if (target === "walkin") {
     fillStaffBarberSelect();
     document.querySelector("#tab-walkin")?.classList.remove("hidden");
     document.querySelector("#account-management-nav")?.classList.add("hidden");
     setTimeout(() => document.querySelector("#staff-queue-name")?.focus(), 50);
+  } else if (target === "queue") {
+    document.querySelector("#tab-queue")?.classList.remove("hidden");
+    document.querySelector("#account-management-nav")?.classList.add("hidden");
+  } else if (target === "appointments") {
+    document.querySelector("#tab-appointments")?.classList.remove("hidden");
+    document.querySelector("#account-management-nav")?.classList.add("hidden");
   } else if (target === "account") {
-    if (canManage) managementTargets.forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
-    else ["analytics", "settings"].forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
-    document.querySelector("#account-management-nav").classList.remove("hidden");
-  } else if (target === "analytics" && fromDashboardNav) {
-    document.querySelector("#tab-analytics").classList.remove("hidden");
-    document.querySelector("#account-management-nav").classList.add("hidden");
-  } else if (managementTargets.includes(target) && canManage) {
-    managementTargets.forEach((name) => document.querySelector(`#tab-${name}`).classList.remove("hidden"));
-    document.querySelector("#account-management-nav").classList.remove("hidden");
-    setTimeout(() => document.querySelector(`#tab-${target}`).scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-  } else if (["analytics", "settings"].includes(target)) {
-    document.querySelector(`#tab-${target}`).classList.remove("hidden");
-    document.querySelector("#account-management-nav").classList.remove("hidden");
+    document.querySelector("#account-management-nav")?.classList.remove("hidden");
+    activeSubTab = canManage ? (currentAccountSubTab || "services") : "settings";
+    if (!canManage && !["analytics", "settings"].includes(activeSubTab)) activeSubTab = "settings";
+    currentAccountSubTab = activeSubTab;
+    document.querySelector(`#tab-${activeSubTab}`)?.classList.remove("hidden");
+  } else if (managementTargets.includes(target)) {
+    document.querySelector("#account-management-nav")?.classList.remove("hidden");
+    activeSubTab = target;
+    currentAccountSubTab = target;
+    document.querySelector(`#tab-${target}`)?.classList.remove("hidden");
   } else {
-    document.querySelector(`#tab-${target === "account" ? "settings" : target}`).classList.remove("hidden");
-    document.querySelector("#account-management-nav").classList.add("hidden");
+    document.querySelector(`#tab-${target}`)?.classList.remove("hidden");
+    document.querySelector("#account-management-nav")?.classList.add("hidden");
   }
-  const dashboardTarget = ["services", "team", "settings", "shop"].includes(target) ? "account" : target;
-  document.querySelectorAll(".dashboard-nav [data-tab]").forEach((item) => item.classList.toggle("active", item.dataset.tab === dashboardTarget));
-  document.querySelectorAll("#account-management-nav [data-tab]").forEach((item) => item.classList.toggle("active", item.dataset.tab === target));
-}));
-const accountSectionObserver = new IntersectionObserver((entries) => {
-  if (document.querySelector("#account-management-nav").classList.contains("hidden")) return;
-  const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-  if (!visible) return;
-  const activeName = visible.target.id.replace("tab-", "");
-  document.querySelectorAll("#account-management-nav [data-tab]").forEach((item) => item.classList.toggle("active", item.dataset.tab === activeName));
-}, { rootMargin: "-190px 0px -45% 0px", threshold: [0, .1, .25, .5] });
-["services", "team", "analytics", "settings", "shop"].forEach((name) => accountSectionObserver.observe(document.querySelector(`#tab-${name}`)));
+
+  // Update Main Dashboard Nav Active States
+  const dashboardTarget = (managementTargets.includes(target) || target === "account") ? "account" : target;
+  document.querySelectorAll(".dashboard-nav [data-tab]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.tab === dashboardTarget);
+  });
+
+  // Update Account Sub-Nav Active States
+  if (activeSubTab) {
+    document.querySelectorAll("#account-management-nav [data-tab]").forEach((item) => {
+      item.classList.toggle("active", item.dataset.tab === activeSubTab);
+    });
+  }
+}
+
+document.querySelectorAll("[data-tab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    activateDashboardTab(button.dataset.tab);
+  });
+});
 document.querySelector("#logout").addEventListener("click", logout);
 document.querySelector("#analytics-filter").addEventListener("submit", async (event) => {
   event.preventDefault(); error.textContent = "";
@@ -891,6 +1058,7 @@ document.querySelector("#settings-mpin-form").addEventListener("submit", async (
 function connectRealtime() { if (socket) socket.close(); const protocol = location.protocol === "https:" ? "wss" : "ws"; socket = new WebSocket(`${protocol}://${location.host}/ws/staff/${shopId}?token=${encodeURIComponent(accessToken)}`); socket.onmessage = refreshAll; socket.onclose = () => { if (accessToken) setTimeout(connectRealtime, 2000); }; }
 if (new URLSearchParams(location.search).get("reset_token")) { document.querySelector("#login-panel").classList.add("hidden"); document.querySelector("#reset-password-panel").classList.remove("hidden"); }
 else if (accessToken) showBoard();
+else checkReturningStaffDevice();
 
 // Permanent barber profiles, shop memberships, services and calendar controls.
 function renderBarbers() {
