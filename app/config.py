@@ -17,12 +17,12 @@ class Settings:
     vapid_public_key: str = os.getenv("VAPID_PUBLIC_KEY", "")
     vapid_private_key: str = os.getenv("VAPID_PRIVATE_KEY", "")
     vapid_subject: str = os.getenv("VAPID_SUBJECT", "mailto:owner@example.com")
-    smtp_host: str = os.getenv("SMTP_HOST", "").rstrip(",").strip()
-    smtp_port: int = int("".join(c for c in os.getenv("SMTP_PORT", "587") if c.isdigit()) or 587)
-    smtp_username: str = os.getenv("SMTP_USERNAME", "").rstrip(",").strip()
-    smtp_password: str = os.getenv("SMTP_PASSWORD", "").rstrip(",").strip()
-    smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "").rstrip(",").strip()
-    smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    smtp_host: str = os.getenv("SMTP_HOST", "").rstrip(",").strip().strip('"').strip("'")
+    smtp_port: int = int("".join(c for c in os.getenv("SMTP_PORT", "465") if c.isdigit()) or 465)
+    smtp_username: str = os.getenv("SMTP_USERNAME", "").rstrip(",").strip().strip('"').strip("'")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "").rstrip(",").strip().strip('"').strip("'")
+    smtp_from_email: str = (os.getenv("SMTP_FROM_EMAIL") or os.getenv("SMTP_USERNAME") or "").rstrip(",").strip().strip('"').strip("'")
+    smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     fast2sms_api_key: str = os.getenv("FAST2SMS_API_KEY", "").strip()
 

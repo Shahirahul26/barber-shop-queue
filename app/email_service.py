@@ -1,25 +1,166 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from email.message import EmailMessage
 import logging
 import smtplib
+import ssl
+from typing import Any
 
 from .config import settings
 
 logger = logging.getLogger(__name__)
 
+# In-memory record of the most recent SMTP dispatch attempt for live diagnostics
+_last_smtp_status: dict[str, Any] = {
+    "timestamp": None,
+    "success": None,
+    "recipient": None,
+    "strategy": None,
+    "error": None,
+}
+
+
+def get_last_smtp_status() -> dict[str, Any]:
+    return dict(_last_smtp_status)
+
 
 def smtp_is_configured() -> bool:
-    return bool(settings.smtp_host and settings.smtp_username and settings.smtp_password and settings.smtp_from_email)
+    host = (settings.smtp_host or "").strip()
+    user = (settings.smtp_username or "").strip()
+    pwd = (settings.smtp_password or "").strip()
+    return bool(host and user and pwd)
 
 
-def send_password_reset_email(recipient: str, reset_url: str) -> None:
+def _clean_credentials() -> tuple[str, int, str, str, str]:
+    host = settings.smtp_host.strip().strip('"').strip("'")
+    port = settings.smtp_port or 465
+    user = settings.smtp_username.strip().strip('"').strip("'")
+    pwd = settings.smtp_password.strip().strip('"').strip("'")
+    from_email = (settings.smtp_from_email or user).strip().strip('"').strip("'")
+    return host, port, user, pwd, from_email
+
+
+def _dispatch_smtp(message: EmailMessage, recipient: str, context_desc: str = "Email") -> tuple[bool, str]:
+    """
+    Robust multi-strategy SMTP sender.
+    Attempts delivery on the primary configured port (e.g. 465 SSL or 587 STARTTLS).
+    If network timeout or connection fails (common on cloud servers like Render that block port 587),
+    automatically falls back to port 465 SSL (or 587 STARTTLS).
+    Also handles 16-character Google App Passwords with or without spaces.
+    """
+    global _last_smtp_status
+
+    if not smtp_is_configured():
+        msg = f"SMTP is not configured on this server. Cannot dispatch {context_desc} to {recipient}."
+        logger.warning(msg)
+        _last_smtp_status = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "success": False,
+            "recipient": recipient,
+            "strategy": "None",
+            "error": "SMTP not configured (missing host, username, or password)",
+        }
+        return False, msg
+
+    host, primary_port, user, pwd, from_email = _clean_credentials()
+
+    # Build strategies: primary port first, then fallback port
+    # Port 465 SSL is direct TLS from byte 0 (never blocked on cloud platforms)
+    # Port 587 STARTTLS starts unencrypted then upgrades (sometimes filtered by cloud firewalls)
+    strategies: list[dict[str, Any]] = []
+    
+    if primary_port == 465:
+        strategies.append({"port": 465, "ssl": True, "name": "Port 465 (Direct SSL)"})
+        strategies.append({"port": 587, "ssl": False, "name": "Port 587 (STARTTLS fallback)"})
+    else:
+        strategies.append({"port": primary_port, "ssl": False, "name": f"Port {primary_port} (STARTTLS)"})
+        strategies.append({"port": 465, "ssl": True, "name": "Port 465 (Direct SSL fallback)"})
+
+    # Prepare password variants (with spaces vs without spaces)
+    passwords = [pwd]
+    if " " in pwd:
+        passwords.append(pwd.replace(" ", ""))
+    elif len(pwd) == 16:
+        # 16-char Google App Password without spaces -> also try grouped by 4
+        passwords.append(f"{pwd[0:4]} {pwd[4:8]} {pwd[8:12]} {pwd[12:16]}")
+
+    errors: list[str] = []
+
+    for strat in strategies:
+        port = strat["port"]
+        use_ssl = strat["ssl"]
+        strat_name = strat["name"]
+        
+        try:
+            logger.info("Attempting %s to %s via %s:%s...", context_desc, recipient, host, port)
+            ctx = ssl.create_default_context()
+
+            if use_ssl:
+                server = smtplib.SMTP_SSL(host, port, timeout=12, context=ctx)
+            else:
+                server = smtplib.SMTP(host, port, timeout=12)
+                server.ehlo()
+                if settings.smtp_use_tls:
+                    server.starttls(context=ctx)
+                    server.ehlo()
+
+            with server:
+                # Attempt login with password variants if needed
+                logged_in = False
+                last_auth_err = None
+
+                for pass_attempt in passwords:
+                    try:
+                        server.login(user, pass_attempt)
+                        logged_in = True
+                        break
+                    except smtplib.SMTPAuthenticationError as auth_err:
+                        last_auth_err = auth_err
+                        logger.warning("SMTP auth failed with password variant on %s: %s", strat_name, auth_err)
+
+                if not logged_in:
+                    raise last_auth_err or smtplib.SMTPAuthenticationError(535, b"Authentication failed")
+
+                server.send_message(message)
+                logger.info("SUCCESS: %s delivered to %s via %s", context_desc, recipient, strat_name)
+
+                _last_smtp_status = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "success": True,
+                    "recipient": recipient,
+                    "strategy": strat_name,
+                    "error": None,
+                }
+                return True, f"Delivered via {strat_name}"
+
+        except Exception as exc:
+            err_msg = f"{strat_name} failed: {type(exc).__name__} ({exc})"
+            logger.warning(err_msg)
+            errors.append(err_msg)
+
+    final_error = " | ".join(errors)
+    logger.error("All SMTP strategies exhausted for %s to %s: %s", context_desc, recipient, final_error)
+    _last_smtp_status = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "success": False,
+        "recipient": recipient,
+        "strategy": "Exhausted all",
+        "error": final_error,
+    }
+    return False, final_error
+
+
+def send_password_reset_email(recipient: str, reset_url: str) -> bool:
     if not smtp_is_configured():
         logger.warning("SMTP not configured. Cannot send password reset to %s", recipient)
-        return
+        return False
+
     try:
+        _, _, _, _, from_email = _clean_credentials()
         message = EmailMessage()
         message["Subject"] = "Reset your TrimTime password"
-        message["From"] = settings.smtp_from_email
+        message["From"] = f"TrimTime <{from_email}>"
+        message["Sender"] = from_email
+        message["Reply-To"] = from_email
         message["To"] = recipient
 
         plain_text = f"""Hello,
@@ -49,30 +190,27 @@ TrimTime Team
         message.set_content(plain_text)
         message.add_alternative(html_text, subtype="html")
 
-        if settings.smtp_port == 465:
-            server_class = smtplib.SMTP_SSL
-        else:
-            server_class = smtplib.SMTP
-
-        with server_class(settings.smtp_host, settings.smtp_port, timeout=15) as server:
-            if settings.smtp_port != 465 and settings.smtp_use_tls:
-                server.starttls()
-            server.login(settings.smtp_username, settings.smtp_password)
-            server.send_message(message)
-            logger.info("Password reset email sent successfully to %s", recipient)
+        ok, _ = _dispatch_smtp(message, recipient, "Password Reset")
+        return ok
     except Exception as exc:
-        logger.warning("Failed to send password reset email to %s: %s", recipient, exc)
+        logger.error("Failed to build password reset email for %s: %s", recipient, exc)
+        return False
 
 
-def send_customer_otp_email(recipient: str, otp: str) -> None:
+def send_customer_otp_email(recipient: str, otp: str) -> bool:
     if not smtp_is_configured():
-        logger.warning("SMTP is not configured. Cannot send OTP to %s", recipient)
-        return
+        logger.warning("SMTP is not configured on this server. Cannot send OTP to %s", recipient)
+        return False
+
     try:
         current_year = datetime.now().year
+        _, _, _, _, from_email = _clean_credentials()
+
         message = EmailMessage()
         message["Subject"] = f"Your TrimTime Verification Code is {otp}"
-        message["From"] = settings.smtp_from_email
+        message["From"] = f"TrimTime <{from_email}>"
+        message["Sender"] = from_email
+        message["Reply-To"] = from_email
         message["To"] = recipient
 
         plain_text = f"""Hello,
@@ -112,23 +250,74 @@ TrimTime Team
         message.set_content(plain_text)
         message.add_alternative(html_text, subtype="html")
 
-        if settings.smtp_port == 465:
-            server_class = smtplib.SMTP_SSL
-        else:
-            server_class = smtplib.SMTP
-
-        with server_class(settings.smtp_host, settings.smtp_port, timeout=15) as server:
-            if settings.smtp_port != 465 and settings.smtp_use_tls:
-                server.starttls()
-            server.login(settings.smtp_username, settings.smtp_password)
-            server.send_message(message)
-            logger.info("Customer OTP email sent successfully to %s", recipient)
-    except smtplib.SMTPAuthenticationError as exc:
-        logger.error(
-            "SMTP Authentication Failed for %s. Google accounts require a 16-character App Password! "
-            "Go to https://myaccount.google.com/apppasswords to create one. Details: %s",
-            settings.smtp_username, exc
-        )
+        ok, _ = _dispatch_smtp(message, recipient, "Customer OTP")
+        return ok
     except Exception as exc:
-        logger.error("Failed to send customer OTP email to %s: %s", recipient, exc)
+        logger.error("Failed to build customer OTP email for %s: %s", recipient, exc)
+        return False
 
+
+def test_smtp_connection(test_recipient: str | None = None) -> dict[str, Any]:
+    """
+    Diagnostic helper to test SMTP settings on the server.
+    """
+    configured = smtp_is_configured()
+    if not configured:
+        return {
+            "configured": False,
+            "host": settings.smtp_host,
+            "port": settings.smtp_port,
+            "username": settings.smtp_username,
+            "from_email": settings.smtp_from_email,
+            "error": "Missing SMTP_HOST, SMTP_USERNAME, or SMTP_PASSWORD in server environment variables.",
+            "instructions": "Set SMTP_HOST=smtp.gmail.com, SMTP_PORT=465, SMTP_USERNAME=your_email, SMTP_PASSWORD=your_app_password in your server environment settings."
+        }
+
+    host, primary_port, user, pwd, from_email = _clean_credentials()
+    results: dict[str, Any] = {
+        "configured": True,
+        "host": host,
+        "primary_port": primary_port,
+        "username": user,
+        "from_email": from_email,
+        "port_465_ssl": None,
+        "port_587_starttls": None,
+        "test_email_sent": False,
+        "last_status": get_last_smtp_status(),
+    }
+
+    ctx = ssl.create_default_context()
+
+    # Test Port 465 SSL
+    try:
+        with smtplib.SMTP_SSL(host, 465, timeout=8, context=ctx) as s:
+            s.login(user, pwd if " " not in pwd else pwd.replace(" ", ""))
+            results["port_465_ssl"] = "SUCCESS (Connected & Authenticated)"
+    except Exception as exc:
+        results["port_465_ssl"] = f"FAILED: {type(exc).__name__} ({exc})"
+
+    # Test Port 587 STARTTLS
+    try:
+        with smtplib.SMTP(host, 587, timeout=8) as s:
+            s.ehlo()
+            s.starttls(context=ctx)
+            s.ehlo()
+            s.login(user, pwd if " " not in pwd else pwd.replace(" ", ""))
+            results["port_587_starttls"] = "SUCCESS (Connected & Authenticated)"
+    except Exception as exc:
+        results["port_587_starttls"] = f"FAILED: {type(exc).__name__} ({exc})"
+
+    # Optional test email dispatch
+    if test_recipient:
+        msg = EmailMessage()
+        msg["Subject"] = "TrimTime SMTP Verification Test"
+        msg["From"] = f"TrimTime <{from_email}>"
+        msg["Sender"] = from_email
+        msg["Reply-To"] = from_email
+        msg["To"] = test_recipient
+        msg.set_content("Congratulations! Your TrimTime server SMTP configuration is operating successfully and ready to deliver OTPs.")
+        ok, detail = _dispatch_smtp(msg, test_recipient, "Test Verification Email")
+        results["test_email_sent"] = ok
+        results["test_email_detail"] = detail
+
+    return results

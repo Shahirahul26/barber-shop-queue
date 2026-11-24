@@ -337,4 +337,58 @@ setupGeoHelper({
   mapViewId: "admin-map-view"
 });
 
+const smtpCheckBtn = document.querySelector("#admin-smtp-check-btn");
+const smtpTestBtn = document.querySelector("#admin-smtp-test-btn");
+const smtpDiagText = document.querySelector("#smtp-diag-text");
+const smtpDiagStatus = document.querySelector("#smtp-diag-status");
+
+async function checkSmtpHealth() {
+  if (!smtpDiagText) return;
+  smtpDiagText.innerHTML = "<em>Testing server SMTP connections on Port 465 (SSL) and Port 587 (STARTTLS)...</em>";
+  if (smtpDiagStatus) smtpDiagStatus.textContent = "";
+  try {
+    const res = await adminRequest("/api/admin/smtp-diagnostic");
+    if (!res.configured) {
+      smtpDiagText.innerHTML = `<span style="color:#dc2626;font-weight:700;">✕ SMTP NOT CONFIGURED ON SERVER</span><br/>${safe(res.error)}<br/><small class="muted">${safe(res.instructions || "")}</small>`;
+      return;
+    }
+    const p465Ok = (res.port_465_ssl || "").includes("SUCCESS");
+    const p587Ok = (res.port_587_starttls || "").includes("SUCCESS");
+    smtpDiagText.innerHTML = `
+      <strong>Host:</strong> ${safe(res.host)} (Primary Port: ${res.primary_port})<br/>
+      <strong>Username:</strong> ${safe(res.username)} · <strong>From:</strong> ${safe(res.from_email)}<br/>
+      <strong>Port 465 SSL:</strong> <span style="font-weight:700;color:${p465Ok ? '#16a34a' : '#dc2626'}">${safe(res.port_465_ssl || 'Unknown')}</span><br/>
+      <strong>Port 587 STARTTLS:</strong> <span style="font-weight:700;color:${p587Ok ? '#16a34a' : '#d97706'}">${safe(res.port_587_starttls || 'Unknown')}</span>
+    `;
+  } catch (err) {
+    smtpDiagText.innerHTML = `<span style="color:#dc2626;font-weight:700;">Error checking SMTP:</span> ${safe(err.message)}`;
+  }
+}
+
+if (smtpCheckBtn) {
+  smtpCheckBtn.addEventListener("click", () => checkSmtpHealth());
+}
+
+if (smtpTestBtn) {
+  smtpTestBtn.addEventListener("click", async () => {
+    if (!smtpDiagStatus) return;
+    smtpDiagStatus.textContent = "Sending test verification email via server...";
+    smtpDiagStatus.style.color = "#0284c7";
+    try {
+      const res = await adminRequest("/api/admin/smtp-test", { method: "POST" });
+      if (res.test_email_sent) {
+        smtpDiagStatus.textContent = `✓ Success! Verification email delivered via ${res.test_email_detail || 'SMTP'}. Check your inbox.`;
+        smtpDiagStatus.style.color = "#16a34a";
+      } else {
+        smtpDiagStatus.textContent = `✕ Failed to send test email: ${res.test_email_detail || 'Check server logs'}`;
+        smtpDiagStatus.style.color = "#dc2626";
+      }
+      checkSmtpHealth();
+    } catch (err) {
+      smtpDiagStatus.textContent = `✕ Error: ${err.message}`;
+      smtpDiagStatus.style.color = "#dc2626";
+    }
+  });
+}
+
 if (adminToken) showAdmin().catch((reason) => error.textContent = reason.message);

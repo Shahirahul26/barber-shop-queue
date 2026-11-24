@@ -27,7 +27,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from .config import settings, validate_production_settings
-from .email_service import send_customer_otp_email, send_password_reset_email, smtp_is_configured
+from .email_service import get_last_smtp_status, send_customer_otp_email, send_password_reset_email, smtp_is_configured, test_smtp_connection
 from .sms_service import send_customer_otp_sms, sms_is_configured
 from .database import Base, SessionLocal, engine, get_db
 from .models import Appointment, AuditEvent, Barber, BarberAvailabilityException, BarberMembershipRequest, BarberPortfolioImage, BarberProfile, BarberServiceAssignment, BarberWeeklyAvailability, CustomerUser, PlatformSetting, PushSubscription, QueueEntry, QueueStatus, Rating, Service, Shop, ShopBarberMembership, StaffUser, TrustedDeviceSession
@@ -477,6 +477,33 @@ def get_platform_banner(db: Session = Depends(get_db)):
     return banner_value(db)
 
 
+@app.get("/api/health/smtp")
+def health_smtp():
+    return {
+        "status": "configured" if smtp_is_configured() else "unconfigured",
+        "configured": smtp_is_configured(),
+        "host": settings.smtp_host,
+        "primary_port": settings.smtp_port,
+        "from_email": settings.smtp_from_email or settings.smtp_username,
+        "username_set": bool(settings.smtp_username),
+        "password_set": bool(settings.smtp_password),
+        "last_dispatch": get_last_smtp_status(),
+    }
+
+
+@app.get("/api/admin/smtp-diagnostic")
+def admin_smtp_diagnostic(staff: StaffUser = Depends(current_staff)):
+    require_platform_admin(staff)
+    return test_smtp_connection()
+
+
+@app.post("/api/admin/smtp-test")
+def admin_smtp_test(staff: StaffUser = Depends(current_staff)):
+    require_platform_admin(staff)
+    target = settings.admin_email or settings.smtp_username
+    return test_smtp_connection(test_recipient=target)
+
+
 @app.put("/api/admin/banner")
 def update_platform_banner(payload: BannerUpdate, staff: StaffUser = Depends(current_staff), db: Session = Depends(get_db)):
     require_platform_admin(staff)
@@ -651,6 +678,8 @@ def request_customer_otp(payload: CustomerOtpRequest, background_tasks: Backgrou
     kind, identifier = customer_identifier(payload.identifier)
     if kind == "phone" and settings.environment == "production":
         raise HTTPException(status_code=503, detail="Mobile OTP delivery is not configured. Use email or contact support.")
+    if kind == "email" and settings.environment == "production" and not smtp_is_configured():
+        raise HTTPException(status_code=503, detail="Email service (SMTP) is not configured on the server. Please check SMTP environment variables.")
     customer = db.scalar(select(CustomerUser).where(getattr(CustomerUser, kind) == identifier))
     if customer is None:
         customer = CustomerUser(**{kind: identifier})
