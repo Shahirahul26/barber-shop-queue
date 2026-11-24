@@ -100,6 +100,8 @@ class TokenOut(BaseModel):
     role: str
     barber_id: int | None = None
     requires_mpin_setup: bool = False
+    approval_status: str = "approved"
+    requires_approval: bool = False
 
 
 class ServiceOut(BaseModel):

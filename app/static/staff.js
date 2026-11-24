@@ -600,7 +600,15 @@ document.querySelector("#registration-form").addEventListener("submit", async (e
     const genderType = document.querySelector("#register-gender-type")?.value || "unisex";
     const response = await fetch("/api/auth/register-shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: document.querySelector("#register-shop-name").value.trim(), phone: document.querySelector("#register-phone").value.trim() || null, gst_number: document.querySelector("#register-gst").value.trim().toUpperCase() || null, address: document.querySelector("#register-address").value.trim(), latitude: latitude ? Number(latitude) : null, longitude: longitude ? Number(longitude) : null, gender_type: genderType, owner_name: document.querySelector("#register-owner-name").value.trim(), owner_email: document.querySelector("#register-email").value.trim().toLowerCase(), owner_password: document.querySelector("#register-password").value, terms_accepted: document.querySelector("#register-terms").checked }) });
     const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail));
-    document.querySelector("#registration-panel").classList.add("hidden"); message("Shop created successfully"); acceptSession(body, document.querySelector("#register-email").value.trim().toLowerCase());
+    document.querySelector("#registration-panel").classList.add("hidden");
+    if (body.requires_approval || body.approval_status === "pending") {
+      message("Shop registration submitted successfully! Your account is pending administrator verification. Once approved by the admin, you can sign in with your email & password.");
+      document.querySelector("#login-panel").classList.remove("hidden");
+      document.querySelector("#tab-staff-signin")?.classList.add("active");
+      document.querySelector("#tab-staff-register")?.classList.remove("active");
+      return;
+    }
+    message("Shop created successfully"); acceptSession(body, document.querySelector("#register-email").value.trim().toLowerCase());
   } catch (reason) { error.textContent = reason.message; }
   finally { button.disabled = false; button.textContent = "Create shop and sign in"; }
 });
@@ -884,46 +892,45 @@ async function deleteBarber(id) {
 }
 
 let currentAccountSubTab = "services";
+let currentDashboardTarget = "queue";
 
 function activateDashboardTab(target) {
   const managementTargets = ["services", "team", "analytics", "settings", "shop"];
   const canManage = ["owner", "manager"].includes(staffRole);
 
-  // Hide all sections first
-  document.querySelectorAll(".tab-section").forEach((section) => section.classList.add("hidden"));
-  document.querySelector("#barber-profile-panel")?.classList.add("hidden");
-
+  let targetSectionId = null;
   let activeSubTab = null;
 
   if (target === "walkin") {
+    targetSectionId = "tab-walkin";
     fillStaffBarberSelect();
-    document.querySelector("#tab-walkin")?.classList.remove("hidden");
     document.querySelector("#account-management-nav")?.classList.add("hidden");
     setTimeout(() => document.querySelector("#staff-queue-name")?.focus(), 50);
   } else if (target === "queue") {
-    document.querySelector("#tab-queue")?.classList.remove("hidden");
+    targetSectionId = "tab-queue";
     document.querySelector("#account-management-nav")?.classList.add("hidden");
   } else if (target === "appointments") {
-    document.querySelector("#tab-appointments")?.classList.remove("hidden");
+    targetSectionId = "tab-appointments";
     document.querySelector("#account-management-nav")?.classList.add("hidden");
   } else if (target === "account") {
     document.querySelector("#account-management-nav")?.classList.remove("hidden");
     activeSubTab = canManage ? (currentAccountSubTab || "services") : "settings";
     if (!canManage && !["analytics", "settings"].includes(activeSubTab)) activeSubTab = "settings";
     currentAccountSubTab = activeSubTab;
-    document.querySelector(`#tab-${activeSubTab}`)?.classList.remove("hidden");
+    targetSectionId = `tab-${activeSubTab}`;
   } else if (managementTargets.includes(target)) {
     document.querySelector("#account-management-nav")?.classList.remove("hidden");
     activeSubTab = target;
     currentAccountSubTab = target;
-    document.querySelector(`#tab-${target}`)?.classList.remove("hidden");
+    targetSectionId = `tab-${target}`;
   } else {
-    document.querySelector(`#tab-${target}`)?.classList.remove("hidden");
+    targetSectionId = `tab-${target}`;
     document.querySelector("#account-management-nav")?.classList.add("hidden");
   }
 
   // Update Main Dashboard Nav Active States
   const dashboardTarget = (managementTargets.includes(target) || target === "account") ? "account" : target;
+  currentDashboardTarget = dashboardTarget;
   document.querySelectorAll(".dashboard-nav [data-tab]").forEach((item) => {
     item.classList.toggle("active", item.dataset.tab === dashboardTarget);
   });
@@ -933,6 +940,24 @@ function activateDashboardTab(target) {
     document.querySelectorAll("#account-management-nav [data-tab]").forEach((item) => {
       item.classList.toggle("active", item.dataset.tab === activeSubTab);
     });
+  }
+
+  // Smooth Section Switch: never collapse layout height to prevent focus/scroll jumps
+  const targetSection = document.querySelector(`#${targetSectionId}`);
+  if (targetSection) {
+    // If it's already visible, no need to touch DOM visibility
+    if (!targetSection.classList.contains("hidden")) {
+      return;
+    }
+    // Show target section first so height never collapses
+    targetSection.classList.remove("hidden");
+    // Hide all other sections
+    document.querySelectorAll(".tab-section").forEach((section) => {
+      if (section !== targetSection) {
+        section.classList.add("hidden");
+      }
+    });
+    document.querySelector("#barber-profile-panel")?.classList.add("hidden");
   }
 }
 

@@ -274,35 +274,13 @@
     </div>
   </div>
 
-  <div class="no-print mt-8 text-center text-xs text-slate-500">
-    Tip: Click the card anytime to see Front & Back. Click <strong>Download PDF</strong> to save the card.
+  <div class="no-print mt-8 text-center text-xs text-slate-400">
+    Tip: Click anywhere on the card to flip Front & Back with smooth 3D animation. Click <strong>Download PDF</strong> for standard 3.5" × 2" card printout.
   </div>
 
   <script>
-    const card = document.getElementById('card');
-    const container = document.querySelector('.card-perspective');
-    let isFlipped = false;
-
     function flipCard() {
-      isFlipped = !isFlipped;
-      card.classList.toggle('flipped', isFlipped);
-    }
-
-    // 3D Parallax Tilt Effect on Mouse Move
-    if (container && window.matchMedia('(hover: hover)').matches) {
-      container.addEventListener('mousemove', (e) => {
-        const rect = container.getBoundingClientRect();
-        const x = e.clientX - rect.left - rect.width / 2;
-        const y = e.clientY - rect.top - rect.height / 2;
-        const tiltX = (y / (rect.height / 2)) * -12;
-        const tiltY = (x / (rect.width / 2)) * 12;
-        const baseRotY = isFlipped ? 180 : 0;
-        card.style.transform = `rotateX(${tiltX}deg) rotateY(${baseRotY + tiltY}deg)`;
-      });
-
-      container.addEventListener('mouseleave', () => {
-        card.style.transform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
-      });
+      document.getElementById('card').classList.toggle('flipped');
     }
   </script>
 </body>

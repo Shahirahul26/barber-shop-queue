@@ -141,84 +141,175 @@
       </video>
 
       <!-- Interactive Scene Simulator -->
-      <div id="simulation-screen" class="py-6 sm:py-10 min-h-[380px] sm:min-h-[440px] flex flex-col justify-center">
+      <div id="simulation-screen" class="py-6 sm:py-8 min-h-[420px] sm:min-h-[480px] flex flex-col justify-center">
         
-        <!-- SCENE 1: The Problem (Lost Walk-ins) -->
+        <!-- SCENE 1: Shop Registration (Maker-Checker) -->
         <div class="scene active" id="scene-1">
-          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-red-500/30 text-center">
-            <span class="text-4xl block mb-3">🚪🚶‍♂️💨</span>
-            <span class="text-xs font-bold text-red-400 uppercase tracking-widest bg-red-950/60 px-3 py-1 rounded-full border border-red-800">Scene 1: The Weekend Bleed</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer peeks in, sees 4 on sofa, and walks away!</h2>
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
+            <span class="text-4xl block mb-2">📝💈🛡️</span>
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 1 · 1-Minute Shop Registration</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Shopkeeper registers shop in 60 seconds</h2>
             <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              "Bhaiya bahut bheed hai, shaam ko dekhte hain." The customer walks to the salon across the street. You just lost ₹350 cash in 5 seconds.
+              Enter shop name, select shop category (<strong>Unisex / Men / Women</strong>), set Google Maps location and owner credentials.
             </p>
-            <div class="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-red-300 font-bold text-xs inline-flex items-center gap-2">
-              <span>✕</span> Lost Revenue: ₹350 per walk-away · 5 customers/day = ₹1,750 lost daily!
-            </div>
-          </div>
-        </div>
-
-        <!-- SCENE 2: Customer Scans QR Code -->
-        <div class="scene" id="scene-2">
-          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
-            <span class="text-4xl block mb-3">📷📱✨</span>
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800">Scene 2: Scan & Freedom to Roam</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer scans your Counter QR standee</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Opens instantly in mobile browser without downloading any app! Customer selects <strong>Haircut + Beard Trim (₹350)</strong>.
-            </p>
-            <div class="bg-emerald-950/80 border border-emerald-500/40 p-4 rounded-xl text-left max-w-md mx-auto space-y-2">
+            <div class="bg-gradient-to-r from-emerald-950/90 to-[#0f3d32] border border-emerald-500/40 p-4 rounded-xl text-left max-w-md mx-auto space-y-2.5">
               <div class="flex justify-between items-center text-xs">
-                <span class="text-emerald-300 font-bold">LIVE TOKEN ISSUED:</span>
-                <span class="text-lg font-black text-[#e2f752] bg-emerald-900 px-3 py-0.5 rounded-lg">#A04</span>
+                <span class="text-emerald-300 font-bold">SHOP CATEGORY:</span>
+                <span class="text-xs font-extrabold text-[#e2f752] bg-emerald-900/80 px-2.5 py-0.5 rounded-md border border-emerald-600/40">🚻 Unisex Salon (All Genders)</span>
               </div>
-              <p class="text-xs text-white">Position: <strong>2 people ahead</strong> · Estimated Wait: <strong>~18 mins</strong></p>
-              <p class="text-[0.7rem] text-emerald-300">Customer walks to nearby cafe to grab chai, knowing their turn is safe!</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- SCENE 3: Smart Gap Monetizer -->
-        <div class="scene" id="scene-3">
-          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-[#e2f752]/40 text-center">
-            <span class="text-4xl block mb-3">⚡✂️💰</span>
-            <span class="text-xs font-bold text-[#e2f752] uppercase tracking-widest bg-[#e2f752]/10 px-3 py-1 rounded-full border border-[#e2f752]/30">Scene 3: Monetizing the 25-Min Gap</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Current cut ends 10:30 · Next booking 11:00</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Normally, your chair sits empty for 30 minutes earning ₹0. TrimTime automatically spots this 25-min gap!
-            </p>
-            <div class="bg-gradient-to-r from-emerald-900/80 to-[#0f3d32] border border-[#e2f752] p-4 rounded-xl text-left max-w-md mx-auto">
-              <span class="text-[0.65rem] font-extrabold text-[#e2f752] uppercase tracking-wider block mb-1">AUTOMATIC BARBER ALERT</span>
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-sm font-bold text-white">Token #A04 (Classic Haircut · 20 min)</p>
-                  <span class="text-[0.7rem] text-emerald-200">Customer is outside nearby</span>
-                </div>
-                <span class="px-2.5 py-1 rounded-full bg-[#e2f752] text-[#091e19] font-black text-xs">
-                  ⚡ Fits open chair gap!
+              <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
+                <span class="text-amber-300 font-bold flex items-center gap-1.5">
+                  <span>⏳</span> Maker-Checker Security
                 </span>
+                <span class="text-amber-200 text-[0.7rem] font-semibold">Pending Admin Approval</span>
+              </div>
+              <p class="text-[0.72rem] text-slate-300 leading-snug">
+                Protects the marketplace: platform admin verifies shop details before it goes live, ensuring only genuine salons onboard.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 2: Admin Approval & Staff MPIN Login -->
+        <div class="scene" id="scene-2">
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
+            <span class="text-4xl block mb-2">⚡🔑📱</span>
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 2 · Admin Approval & Fast MPIN Sign In</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Admin approves · Staff logs in with 6-digit MPIN</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Admin activates the salon with 1 tap. Barbers and stylists sign in in 2 seconds on mobile or tablet using their 6-digit MPIN.
+            </p>
+            <div class="bg-black/60 border border-emerald-500/30 p-4 rounded-xl text-left max-w-md mx-auto space-y-3">
+              <div class="flex items-center justify-between text-xs pb-2 border-b border-white/10">
+                <span class="text-emerald-400 font-bold flex items-center gap-1"><span>✓</span> Verified by Admin</span>
+                <span class="text-emerald-300 text-[0.7rem] bg-emerald-950 px-2 py-0.5 rounded font-mono">APPROVED</span>
+              </div>
+              <div class="text-center py-1">
+                <p class="text-[0.7rem] text-slate-400 font-bold uppercase tracking-wider mb-2">Enter Barber MPIN</p>
+                <div class="flex justify-center gap-2">
+                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+                </div>
+              </div>
+              <p class="text-center text-xs text-emerald-300 font-semibold">Instant login · No password required during busy shifts!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 3: Add Staff & Services -->
+        <div class="scene" id="scene-3">
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-blue-500/30 text-center">
+            <span class="text-4xl block mb-2">👥✂️🏷️</span>
+            <span class="text-xs font-bold text-blue-400 uppercase tracking-widest bg-blue-950/70 px-3 py-1 rounded-full border border-blue-800">Scene 3 · Team & Service Catalog</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Set up stylists, service prices & durations</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Add your barbers with custom specialties and configure your full service menu with exact time slots so waiting estimates are 100% accurate.
+            </p>
+            <div class="grid grid-cols-2 gap-2.5 max-w-md mx-auto text-left text-xs">
+              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
+                <span class="text-slate-400 text-[0.68rem] font-bold block mb-1">STYLING TEAM</span>
+                <p class="text-white font-bold">Rahul · <span class="text-emerald-400 font-normal">Master Stylist</span></p>
+                <p class="text-white font-bold mt-1">Priya · <span class="text-emerald-400 font-normal">Color Specialist</span></p>
+              </div>
+              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
+                <span class="text-slate-400 text-[0.68rem] font-bold block mb-1">MENU & PRICING</span>
+                <p class="text-white font-bold">Haircut <span class="text-emerald-300 font-normal">(25m · ₹250)</span></p>
+                <p class="text-white font-bold mt-1">Beard Trim <span class="text-emerald-300 font-normal">(15m · ₹150)</span></p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- SCENE 4: Chair Start & Completed -->
+        <!-- SCENE 4: Generate Walk-in Token -->
         <div class="scene" id="scene-4">
-          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-blue-500/30 text-center">
-            <span class="text-4xl block mb-3">💈⭐💵</span>
-            <span class="text-xs font-bold text-blue-400 uppercase tracking-widest bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800">Scene 4: 1-Tap 'Start' & 'Mark Done'</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer enters chair. Zero delay.</h2>
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-[#e2f752]/40 text-center">
+            <span class="text-4xl block mb-2">🎫🚶‍♂️⏱️</span>
+            <span class="text-xs font-bold text-[#e2f752] uppercase tracking-widest bg-[#e2f752]/10 px-3 py-1 rounded-full border border-[#e2f752]/30">Scene 4 · Desk Walk-in Token Generator</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer walks in without smartphone? No problem!</h2>
             <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Barber taps <strong>[Start]</strong> on tablet. Customer mobile turns green ("In Chair!"). Barber finishes cut at 10:55 AM, taps <strong>[Mark Done]</strong>.
+              Front desk enters customer name, multi-selects desired services, assigns a barber, and prints or generates an instant queue token.
             </p>
-            <div class="grid grid-cols-2 gap-3 max-w-md mx-auto text-left">
-              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span class="text-xs text-slate-400 block font-bold">Barber Profit</span>
-                <span class="text-base font-black text-emerald-400">+₹350 Earned in Empty Gap</span>
+            <div class="bg-gradient-to-r from-emerald-950/90 to-[#0f3d32] border border-[#e2f752] p-4 rounded-xl text-left max-w-md mx-auto space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-xs font-bold text-white">Customer: <strong>Amit Sharma</strong></span>
+                <span class="px-2.5 py-0.5 rounded-lg bg-[#e2f752] text-[#091e19] font-black text-sm">#A01</span>
               </div>
-              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span class="text-xs text-slate-400 block font-bold">Customer Review</span>
-                <span class="text-base font-black text-[#e2f752]">★★★★★ 5-Star Rating</span>
+              <p class="text-xs text-emerald-200">Services: <strong>Haircut + Beard Trim (40 mins · ₹400)</strong></p>
+              <div class="flex items-center justify-between text-[0.72rem] text-slate-300 pt-1 border-t border-white/10">
+                <span>Stylist: <strong>Rahul (Assigned)</strong></span>
+                <span class="text-[#e2f752] font-bold">Estimated wait: ~12 mins</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 5: Live Queue & Smart Gap Monetizer -->
+        <div class="scene" id="scene-5">
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/40 text-center">
+            <span class="text-4xl block mb-2">⚡✂️💺</span>
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 5 · Live Queue & Smart Gap Filler</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Manage live queue · Monetize empty 25-minute gaps</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Staff see active tokens in real time. When an appointment finishes early, TrimTime automatically alerts nearby walk-in customers to fill the chair.
+            </p>
+            <div class="bg-emerald-950/90 border border-emerald-500/40 p-4 rounded-xl text-left max-w-md mx-auto space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-white">Token #A01 · In Chair (Rahul)</span>
+                <span class="px-2 py-0.5 rounded bg-emerald-500 text-white font-extrabold text-[0.68rem]">Serving Now</span>
+              </div>
+              <div class="p-2 rounded-lg bg-[#e2f752]/15 border border-[#e2f752]/40 text-xs flex items-center justify-between">
+                <span class="text-[#e2f752] font-bold">⚡ 25-min gap before next booking!</span>
+                <span class="text-white font-semibold text-[0.7rem] bg-[#091e19] px-2 py-0.5 rounded">Chair 100% Monetized</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 6: Customer Appointment Booking -->
+        <div class="scene" id="scene-6">
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-purple-500/30 text-center">
+            <span class="text-4xl block mb-2">📅⭐💇‍♂️</span>
+            <span class="text-xs font-bold text-purple-400 uppercase tracking-widest bg-purple-950/70 px-3 py-1 rounded-full border border-purple-800">Scene 6 · Customer Appointment Scheduling</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customers book future slots with preferred stylists</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              VIP customers choose date, time and their favorite barber directly on their mobile phone. Automatic SMS reminders ensure zero no-shows.
+            </p>
+            <div class="bg-black/60 border border-purple-500/30 p-4 rounded-xl text-left max-w-md mx-auto space-y-2 text-xs">
+              <div class="flex justify-between items-center">
+                <span class="text-purple-300 font-bold">TODAY'S APPOINTMENT</span>
+                <span class="text-white font-mono bg-purple-950 px-2 py-0.5 rounded">4:30 PM - 5:15 PM</span>
+              </div>
+              <p class="text-white font-bold">Customer: Rohan Verma · Stylist: Priya</p>
+              <p class="text-slate-400 text-[0.7rem]">Services: Hair Spa + Deep Conditioning (₹850) · Pre-paid</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 7: Real-Time Revenue & Analytics -->
+        <div class="scene" id="scene-7">
+          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
+            <span class="text-4xl block mb-2">📊💰📈</span>
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 7 · Revenue & Performance Analytics</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Real-time daily earnings & barber performance</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Owner tracks daily cash collections, UPI payments, stylist commissions, and peak rush hours with zero manual register calculation.
+            </p>
+            <div class="grid grid-cols-3 gap-2.5 max-w-md mx-auto text-left text-xs">
+              <div class="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                <span class="text-slate-400 text-[0.65rem] font-bold block">TODAY'S SALES</span>
+                <span class="text-base font-black text-emerald-400">₹14,350</span>
+              </div>
+              <div class="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                <span class="text-slate-400 text-[0.65rem] font-bold block">SERVED CLIENTS</span>
+                <span class="text-base font-black text-white">42 Cuts</span>
+              </div>
+              <div class="bg-white/10 p-2.5 rounded-xl border border-white/10">
+                <span class="text-slate-400 text-[0.65rem] font-bold block">LOST CLIENTS</span>
+                <span class="text-base font-black text-[#e2f752]">0 Bleed</span>
               </div>
             </div>
           </div>
@@ -232,16 +323,25 @@
         <!-- Scene Selector Pills -->
         <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0" id="scene-pills">
           <button onclick="goToScene(1)" class="step-pill active px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap">
-            1. The Problem
+            1. Registration
           </button>
           <button onclick="goToScene(2)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
-            2. Scan QR
+            2. Approval & MPIN
           </button>
           <button onclick="goToScene(3)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
-            3. Smart Gap
+            3. Staff & Services
           </button>
           <button onclick="goToScene(4)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
-            4. In Chair & Done
+            4. Walk-in Token
+          </button>
+          <button onclick="goToScene(5)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
+            5. Live Queue
+          </button>
+          <button onclick="goToScene(6)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
+            6. Appointments
+          </button>
+          <button onclick="goToScene(7)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
+            7. Analytics
           </button>
         </div>
 
@@ -311,7 +411,7 @@
 
   <script>
     let currentScene = 1;
-    const totalScenes = 4;
+    const totalScenes = 7;
     let isPlaying = true;
     let timer = null;
     let soundEnabled = true;
@@ -351,8 +451,16 @@
         btn.classList.toggle('text-slate-300', idx + 1 !== n);
       });
       
-      const timestamps = ["0:15 / 1:20", "0:35 / 1:20", "0:55 / 1:20", "1:15 / 1:20"];
-      document.getElementById('video-timestamp').textContent = timestamps[n - 1] || "0:00 / 1:20";
+      const timestamps = [
+        "0:12 / 1:30",
+        "0:25 / 1:30",
+        "0:38 / 1:30",
+        "0:52 / 1:30",
+        "1:05 / 1:30",
+        "1:18 / 1:30",
+        "1:30 / 1:30"
+      ];
+      document.getElementById('video-timestamp').textContent = timestamps[n - 1] || "0:00 / 1:30";
       playDing();
     }
 

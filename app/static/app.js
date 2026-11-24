@@ -781,7 +781,7 @@ async function selectAndShowShop(targetShopId, options = {}) {
   }
 }
 
-let currentGenderFilter = "all";
+let currentGenderFilter = "unisex";
 
 function formatShopGenderBadge(genderType) {
   const type = (genderType || "unisex").toLowerCase();
@@ -797,9 +797,12 @@ function formatShopGenderBadge(genderType) {
 function renderShopCards(shops, showAll = false) {
   const cards = document.querySelector("#nearby-shop-cards");
   let displayShops = showAll ? shops : shops.filter((item) => item.id !== shopId);
-  if (currentGenderFilter !== "all") {
-    displayShops = displayShops.filter((item) => (item.gender_type || "unisex").toLowerCase() === currentGenderFilter);
+  if (currentGenderFilter === "men") {
+    displayShops = displayShops.filter((item) => (item.gender_type || "unisex").toLowerCase() === "men");
+  } else if (currentGenderFilter === "women") {
+    displayShops = displayShops.filter((item) => (item.gender_type || "unisex").toLowerCase() === "women");
   }
+  // When 'unisex' is active: all shops are displayed
   if (!displayShops.length) {
     cards.innerHTML = '<p class="muted">No shops match the selected category.</p>';
     return;

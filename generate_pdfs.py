@@ -403,82 +403,165 @@ def build_presentation_pdf(output_path: Path):
 
 def build_visiting_card_pdf(output_path: Path):
     from reportlab.lib.pagesizes import inch
+    from reportlab.lib import colors
     # Standard business card is 3.5 in x 2.0 in (252 x 144 pt)
-    card_width, card_height = 3.5 * inch, 2.0 * inch
-    doc = SimpleDocTemplate(
-        str(output_path),
-        pagesize=(card_width, card_height),
-        leftMargin=10,
-        rightMargin=10,
-        topMargin=10,
-        bottomMargin=10,
-    )
-    styles = getSampleStyleSheet()
+    w, h = 3.5 * inch, 2.0 * inch
+    c = canvas.Canvas(str(output_path), pagesize=(w, h))
 
-    front_title = ParagraphStyle(
-        "FTitle", fontName="Helvetica-Bold", fontSize=13, leading=15, textColor=LIME
-    )
-    front_sub = ParagraphStyle(
-        "FSub", fontName="Helvetica", fontSize=6, leading=8, textColor=WHITE
-    )
-    front_tagline = ParagraphStyle(
-        "FTag", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=WHITE
-    )
-    front_contact = ParagraphStyle(
-        "FContact", fontName="Helvetica", fontSize=5.5, leading=7.5, textColor=WHITE
-    )
+    # ================= PAGE 1: FRONT =================
+    # Card Background with rounded corners
+    c.setFillColor(colors.HexColor("#0a251e"))
+    c.setStrokeColor(colors.HexColor("#165b4c"))
+    c.setLineWidth(1)
+    c.roundRect(4, 4, w - 8, h - 8, 8, fill=True, stroke=True)
 
-    story = []
+    # Accent glow circle
+    c.setFillColor(colors.HexColor("#0f3d32"))
+    c.circle(w - 20, h - 20, 45, fill=True, stroke=False)
 
-    # FRONT
-    f_data = [
-        [Paragraph("TRIM<b>TIME</b>", front_title), Paragraph("Unisex · Men · Women", front_sub)],
-        [Paragraph("Skip the waiting room.<br/><font color='#e2f752'>Keep every chair full.</font>", front_tagline), ""],
-        [Paragraph("<b>Rahul Kumar</b> · Product & Growth Lead", front_contact),
-         Paragraph("📞 +91 98765 43210<br/>🌐 trimtime.in", front_contact)]
-    ]
-    t_f = Table(f_data, colWidths=[150, 82])
-    t_f.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), DARK_PINE),
-        ("SPAN", (0, 1), (1, 1)),
-        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-        ("ALIGN", (1, 2), (1, 2), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-    ]))
-    story.append(t_f)
-    story.append(PageBreak())
+    # Logo Block: Neon Lime Box with Dark 'T'
+    c.setFillColor(LIME)
+    c.roundRect(14, h - 34, 20, 20, 4, fill=True, stroke=False)
+    c.setFont("Helvetica-Bold", 14)
+    c.setFillColor(DEEP_DARK)
+    c.drawCentredString(24, h - 30, "T")
 
-    # BACK
-    b_head = ParagraphStyle("BHead", fontName="Helvetica-Bold", fontSize=7, leading=9, textColor=DARK_PINE)
-    b_bullet = ParagraphStyle("BBullet", fontName="Helvetica", fontSize=5, leading=6.5, textColor=TEXT_DARK)
-    b_cta = ParagraphStyle("BCTA", fontName="Helvetica-Bold", fontSize=5.5, leading=7, textColor=MID_PINE)
+    # Brand Name
+    c.setFont("Helvetica-Bold", 11)
+    c.setFillColor(WHITE)
+    c.drawString(38, h - 24, "TRIM")
+    c.setFillColor(LIME)
+    c.drawString(67, h - 24, "TIME")
 
-    b_data = [
-        [Paragraph("<b>WHY TRIMTIME?</b>", b_head), Paragraph("Free 7-Day Pilot", b_cta)],
-        [
-            Paragraph("<b>FOR SALONS:</b><br/>• Zero walk-away losses<br/>• Fills 20-min empty gaps<br/>• +₹30k–₹60k monthly profit", b_bullet),
-            Paragraph("<b>FOR CUSTOMERS:</b><br/>• Live mobile wait clock<br/>• Zero sofa waiting<br/>• 1-tap 6-digit MPIN login", b_bullet)
-        ],
-        [Paragraph("<b>▶ Scan for Video Demo:</b><br/>trimtime.in/demo", b_bullet), Paragraph("<b>Book Free Pilot:</b><br/>+91 98765 43210", b_cta)]
-    ]
-    t_b = Table(b_data, colWidths=[116, 116])
-    t_b.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), WHITE),
-        ("BOX", (0, 0), (-1, -1), 1, BORDER_LIGHT),
-        ("GRID", (0, 0), (-1, -1), 0.5, BORDER_LIGHT),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    story.append(t_b)
+    # Sub-brand
+    c.setFont("Helvetica", 5)
+    c.setFillColor(colors.HexColor("#a7f3d0"))
+    c.drawString(38, h - 31, "SALON QUEUE & CHAIR OS")
 
-    doc.build(story)
+    # Top right category badge
+    c.setFillColor(colors.HexColor("#165b4c"))
+    c.roundRect(w - 88, h - 28, 74, 12, 6, fill=True, stroke=False)
+    c.setFont("Helvetica-Bold", 4.8)
+    c.setFillColor(colors.HexColor("#ecfdf5"))
+    c.drawCentredString(w - 51, h - 24, "Unisex · Men · Women")
+
+    # Center Tagline Headline
+    c.setFont("Helvetica-Bold", 10.5)
+    c.setFillColor(WHITE)
+    c.drawString(14, h - 56, "Skip the waiting room.")
+    c.setFillColor(LIME)
+    c.drawString(14, h - 69, "Keep every chair full.")
+
+    # Subtitle
+    c.setFont("Helvetica", 5.5)
+    c.setFillColor(colors.HexColor("#d1fae5"))
+    c.drawString(14, h - 80, "Live QR queues · Smart gap monetization · 1-tap MPIN booking")
+
+    # Bottom Divider Line
+    c.setStrokeColor(colors.HexColor("#165b4c"))
+    c.setLineWidth(0.6)
+    c.line(14, 38, w - 14, 38)
+
+    # Bottom Left: Founder Info
+    c.setFont("Helvetica-Bold", 7)
+    c.setFillColor(WHITE)
+    c.drawString(14, 26, "Rahul Kumar")
+    c.setFont("Helvetica", 5)
+    c.setFillColor(colors.HexColor("#a7f3d0"))
+    c.drawString(14, 17, "Product & Growth Lead")
+
+    # Bottom Right: Contact Details
+    c.setFont("Helvetica-Bold", 5.8)
+    c.setFillColor(WHITE)
+    c.drawRightString(w - 14, 26, "📞 +91 98765 43210")
+    c.setFont("Helvetica", 5)
+    c.setFillColor(colors.HexColor("#a7f3d0"))
+    c.drawRightString(w - 14, 17, "🌐 trimtime.in · get@trimtime.in")
+
+    c.showPage()
+
+    # ================= PAGE 2: BACK =================
+    # Card Background: Clean Luxury Off-White
+    c.setFillColor(colors.HexColor("#faf8f5"))
+    c.setStrokeColor(colors.HexColor("#e2e8f0"))
+    c.setLineWidth(1)
+    c.roundRect(4, 4, w - 8, h - 8, 8, fill=True, stroke=True)
+
+    # Top Header
+    c.setFont("Helvetica-Bold", 7.5)
+    c.setFillColor(DARK_PINE)
+    c.drawString(14, h - 18, "WHY TRIMTIME?")
+
+    c.setFillColor(MINT)
+    c.setStrokeColor(colors.HexColor("#a7f3d0"))
+    c.roundRect(w - 76, h - 21, 62, 11, 5, fill=True, stroke=True)
+    c.setFont("Helvetica-Bold", 5)
+    c.setFillColor(DARK_PINE)
+    c.drawCentredString(w - 45, h - 17.5, "Free 7-Day Pilot")
+
+    # Divider line
+    c.setStrokeColor(BORDER_LIGHT)
+    c.setLineWidth(0.5)
+    c.line(14, h - 25, w - 14, h - 25)
+
+    # Dual Columns: For Salons vs For Customers
+    box_w = (w - 36) / 2
+    # Left Box: For Salons
+    c.setFillColor(WHITE)
+    c.roundRect(14, h - 78, box_w, 48, 4, fill=True, stroke=True)
+    c.setFont("Helvetica-Bold", 5.5)
+    c.setFillColor(DARK_PINE)
+    c.drawString(18, h - 35, "💈 FOR SALON OWNERS:")
+    c.setFont("Helvetica", 4.8)
+    c.setFillColor(TEXT_DARK)
+    c.drawString(18, h - 45, "✓ Zero walk-away losses")
+    c.drawString(18, h - 54, "✓ Fills 20-min empty gaps")
+    c.drawString(18, h - 63, "✓ +₹30k–₹60k monthly profit")
+    c.drawString(18, h - 72, "✓ Real-time staff analytics")
+
+    # Right Box: For Customers
+    c.setFillColor(WHITE)
+    c.roundRect(22 + box_w, h - 78, box_w, 48, 4, fill=True, stroke=True)
+    c.setFont("Helvetica-Bold", 5.5)
+    c.setFillColor(BLUE_TEXT)
+    c.drawString(26 + box_w, h - 35, "👤 FOR CUSTOMERS:")
+    c.setFont("Helvetica", 4.8)
+    c.setFillColor(TEXT_DARK)
+    c.drawString(26 + box_w, h - 45, "✓ Live mobile wait clock")
+    c.drawString(26 + box_w, h - 54, "✓ Zero sofa waiting")
+    c.drawString(26 + box_w, h - 63, "✓ 1-tap 6-digit MPIN login")
+    c.drawString(26 + box_w, h - 72, "✓ Book favourite stylist")
+
+    # Bottom Divider
+    c.line(14, 46, w - 14, 46)
+
+    # Bottom QR Code + Video Demo Link
+    qr_path = "app/static/demo_qr.png"
+    if os.path.exists(qr_path):
+        c.drawImage(qr_path, 14, 10, width=32, height=32, preserveAspectRatio=True)
+
+    c.setFont("Helvetica-Bold", 6.2)
+    c.setFillColor(TEXT_DARK)
+    c.drawString(50, 34, "▶ Scan for Video Demo")
+    c.setFont("Helvetica", 4.8)
+    c.setFillColor(TEXT_MUTED)
+    c.drawString(50, 25, "Watch 60-sec demo on phone")
+    c.setFont("Helvetica-Bold", 4.8)
+    c.setFillColor(EMERALD)
+    c.drawString(50, 16, "trimtime.in/demo")
+
+    # Bottom Right CTA Button
+    c.setFillColor(DARK_PINE)
+    c.roundRect(w - 74, 12, 60, 24, 4, fill=True, stroke=False)
+    c.setFont("Helvetica-Bold", 5.5)
+    c.setFillColor(WHITE)
+    c.drawCentredString(w - 44, 25, "Watch Demo ▶")
+    c.setFont("Helvetica", 4.2)
+    c.setFillColor(LIME)
+    c.drawCentredString(w - 44, 17, "Book Free Pilot")
+
+    c.showPage()
+    c.save()
     print(f"Visiting Card PDF successfully built at: {output_path}")
 
 

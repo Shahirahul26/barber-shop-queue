@@ -34,7 +34,7 @@ button:hover { background:#2c4233; }.secondary { background:#dfe4d8;color:var(--
 .ticket-head { display:flex;justify-content:space-between;align-items:center; }.ticket-head span { text-transform:capitalize;background:var(--lime);padding:8px 12px;border-radius:999px;font-weight:700; }
 .ticket-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:28px 0; }.ticket-grid div { background:var(--ink);color:white;padding:22px;border-radius:14px; }
 .staff-main { width:min(1100px,92vw); }.pin-row { display:flex;align-items:end;gap:16px;padding:22px; }.pin-row label { flex:1; }
-.dashboard-nav-wrap { position:sticky;top:0;z-index:20;background:var(--paper);padding:10px 0 12px; }.dashboard-nav { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0; }.dashboard-nav button { min-height:82px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;background:var(--cream);color:var(--ink);border:1px solid var(--line);box-shadow:0 8px 22px #17231c12; }.dashboard-nav button:hover { background:#233c35;color:white; }.dashboard-nav button.active { background:#245c52;color:white;border-color:#245c52;box-shadow:0 10px 25px #245c5238; }.dashboard-nav button.active span { color:#bfe4dc; }.dashboard-nav span { color:#527000;font-size:.75rem;letter-spacing:.12em; }.toolbar { display:flex;gap:12px;align-items:center;padding:18px; }.button-link { background:var(--ink);color:white;padding:14px 18px;border-radius:10px; }.management-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:stretch; }.mini-card { margin:0;display:flex;flex-direction:column;gap:10px;padding:20px;height:100%; }.success { color:#527000;font-weight:700; }.account-menu { display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:10px;padding:10px;background:var(--cream);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px #17231c1c; }.account-menu button { padding:12px 10px;background:#edf0eb;color:#26352e;border:1px solid #d5ddd7; }.account-menu button:hover { background:#dce9e5;color:#183e36; }.account-menu button.active { background:#245c52;color:white;border-color:#245c52;box-shadow:0 5px 14px #245c5233; }.account-menu .account-logout { background:#fff1ef;color:#a63d32;border-color:#e9c0bb; }.account-menu .account-logout:hover { background:#a63d32;color:white;border-color:#a63d32; }
+.toolbar { display:flex;gap:12px;align-items:center;padding:18px; }.button-link { background:var(--ink);color:white;padding:14px 18px;border-radius:10px; }.management-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:stretch; }.mini-card { margin:0;display:flex;flex-direction:column;gap:10px;padding:20px;height:100%; }.success { color:#527000;font-weight:700; }
 .tab-section { scroll-margin-top:190px; }
 .staff-banner { margin:34px 0 24px;padding:clamp(28px,5vw,54px);border-radius:24px;color:white;background:linear-gradient(125deg,#173c35,#245c52 58%,#367a6e);box-shadow:0 18px 45px #173c3533;overflow:hidden;position:relative; }.staff-banner::after { content:"";position:absolute;width:230px;height:230px;border-radius:50%;right:-70px;top:-100px;background:#ffffff12; }.staff-banner .eyebrow { color:#bfe4dc; }.staff-banner h1 { font-size:clamp(2.2rem,6vw,4.6rem);max-width:820px; }.staff-banner > p:last-child { max-width:650px;margin-bottom:0;color:#e1f0ec;font-size:1.05rem; }.shop-photo-preview { width:100%;max-height:360px;object-fit:cover;border-radius:16px;border:1px solid var(--line);grid-column:1/-1; }
 .auth-layout { display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch; }.auth-layout > .panel { margin:0; }.signin-card { display:flex;flex-direction:column; }.signin-card form { display:flex;flex-direction:column;gap:18px; }.signin-card form button { width:100%;justify-content:center;margin-top:4px; }.forgot-link { align-self:flex-start;margin-top:16px;padding:0;background:transparent;color:#245c52;text-decoration:underline;text-underline-offset:3px; }.forgot-link:hover { background:transparent;color:#173c35; }.register-promo { display:flex;flex-direction:column;gap:24px;justify-content:space-between;background:#edf4f1; }.register-promo button { width:100%;margin-top:18px; }.register-promo-image { min-height:230px;border-radius:16px;background-color:#245c52;background-image:linear-gradient(140deg,#173c3540,#245c5215),linear-gradient(135deg,#245c52 0 38%,#c9ded8 38% 61%,#173c35 61%);background-position:center;background-size:cover;box-shadow:inset 0 0 0 1px #ffffff44; }
@@ -1311,12 +1311,12 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   transform: translateY(-1px);
 }
 
-/* RADIANT ACTIVE HIGHLIGHT - STAFF (Gold Glow) */
+/* RADIANT ACTIVE HIGHLIGHT - STAFF (Emerald Luxury) */
 .staff-tab-btn.active {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
-  color: #0d1527 !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
   font-weight: 850 !important;
-  box-shadow: 0 4px 22px rgba(251, 191, 36, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.45) inset !important;
+  box-shadow: 0 4px 22px rgba(16, 185, 129, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.35) inset !important;
   transform: translateY(-1px);
 }
 
@@ -2179,11 +2179,11 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   min-height: 52px;
   font-size: 1.05rem;
   font-weight: 850;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
-  color: #0f172a !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
   border: 0;
   border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(251, 191, 36, 0.4);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -2193,9 +2193,9 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   transition: all 0.2s ease;
 }
 #staff-fast-mpin-submit:hover {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(251, 191, 36, 0.5);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.45);
 }
 
 /* Professional Staff Dashboard Navigation */
@@ -2230,6 +2230,9 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   font-size: 0.98rem;
   font-weight: 700;
@@ -2316,25 +2319,29 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
 .account-menu {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px;
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
-  border-radius: 14px;
-  box-shadow: 0 4px 14px rgba(16, 44, 39, 0.05);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(16, 44, 39, 0.05);
 }
 .account-menu button,
 .account-menu .account-menu-btn {
   padding: 12px 14px;
-  border-radius: 10px !important;
+  min-height: 46px;
+  border-radius: 12px !important;
   background: #ffffff !important;
   color: #475569 !important;
   border: 1.5px solid #e2e8f0 !important;
   font-weight: 700;
   font-size: 0.90rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2342,13 +2349,14 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
 }
 .account-menu button:hover:not(.active):not(.account-logout),
 .account-menu .account-menu-btn:hover:not(.active):not(.account-logout) {
-  background: #f1f5f9 !important;
+  background: #f8fafc !important;
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
+  transform: translateY(-1px);
 }
 .account-menu button:focus-visible,
 .account-menu .account-menu-btn:focus-visible {
-  outline: 2.5px solid #0f3d32 !important;
+  outline: 2.5px solid #10b981 !important;
   outline-offset: 2px !important;
 }
 .account-menu button.active,
@@ -2357,17 +2365,19 @@ button,.button-link{border-radius:12px;font-weight:800;transition:transform .18s
   color: #ffffff !important;
   font-weight: 750 !important;
   border: 1.5px solid #0f3d32 !important;
-  box-shadow: 0 3px 10px rgba(15, 61, 50, 0.18) !important;
+  box-shadow: 0 4px 14px rgba(15, 61, 50, 0.25) !important;
+  transform: translateY(-1px);
 }
 .account-menu .account-logout {
-  background: #ffffff !important;
+  background: #fff5f5 !important;
   color: #dc2626 !important;
   border: 1.5px solid #fee2e2 !important;
 }
 .account-menu .account-logout:hover {
-  background: #fef2f2 !important;
+  background: #fee2e2 !important;
   color: #b91c1c !important;
   border-color: #fca5a5 !important;
+  transform: translateY(-1px);
 }
 
 /* Smart Gap Fit Badge in Staff Queue */

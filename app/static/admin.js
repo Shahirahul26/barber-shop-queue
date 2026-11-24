@@ -54,7 +54,20 @@ document.querySelector("#login-image-form").addEventListener("submit", async (ev
 
 async function loadAdminShops() {
   const shops = await adminRequest("/api/admin/shops");
-  document.querySelector("#admin-shop-list").innerHTML = shops.map((shop) => `<article class="panel admin-shop-card"><div><span class="eyebrow">${safe(shop.approval_status)}</span><h3>${safe(shop.name)}</h3><p>${safe(shop.address)}</p><small>Customer QR route: /customer?shop=${shop.id}</small><div class="shop-admin-features" style="margin-top:10px;display:flex;align-items:center;gap:10px;"><strong style="font-size:0.85rem;">Book Appointment:</strong><button type="button" data-appointment-toggle="${shop.id}" data-enabled="${shop.appointments_enabled ? "true" : "false"}" class="${shop.appointments_enabled ? "secondary" : "ghost"}" style="padding:4px 10px;font-size:0.82rem;">${shop.appointments_enabled ? "✓ Enabled" : "✕ Disabled"}</button></div></div><img src="/api/shops/${shop.id}/qr" alt="QR for ${safe(shop.name)}" /><div class="actions"><a class="button-link" href="/customer?shop=${shop.id}" target="_blank">Open</a><button data-id="${shop.id}" data-status="${shop.approval_status === "approved" ? "suspended" : "approved"}" class="secondary">${shop.approval_status === "approved" ? "Suspend" : "Approve"}</button></div><div id="admin-staff-${shop.id}" class="admin-staff-list"><small>Loading staff…</small></div></article>`).join("");
+  document.querySelector("#admin-shop-list").innerHTML = shops.map((shop) => {
+    const isPending = shop.approval_status === "pending";
+    const isApproved = shop.approval_status === "approved";
+    const badgeStyle = isPending
+      ? "background:#fef3c7;color:#92400e;border:1px solid #fde68a;"
+      : isApproved
+      ? "background:#dcfce7;color:#166534;border:1px solid #bbf7d0;"
+      : "background:#fee2e2;color:#991b1b;border:1px solid #fecaca;";
+    const badgeText = isPending ? "⏳ PENDING ADMIN APPROVAL" : isApproved ? "✓ APPROVED & ACTIVE" : "✕ SUSPENDED";
+    const actionBtn = isApproved
+      ? `<button data-id="${shop.id}" data-status="suspended" class="secondary">Suspend</button>`
+      : `<button data-id="${shop.id}" data-status="approved" class="primary" style="background:#0f3d32;color:white;font-weight:700;">Approve Shop ✓</button>`;
+    return `<article class="panel admin-shop-card"><div><span class="eyebrow" style="${badgeStyle}padding:3px 9px;border-radius:999px;font-weight:800;font-size:0.72rem;">${badgeText}</span><h3>${safe(shop.name)}</h3><p>${safe(shop.address)}</p><small>Category: <strong>${safe(shop.gender_type || "unisex").toUpperCase()}</strong> · Customer QR route: /customer?shop=${shop.id}</small><div class="shop-admin-features" style="margin-top:10px;display:flex;align-items:center;gap:10px;"><strong style="font-size:0.85rem;">Book Appointment:</strong><button type="button" data-appointment-toggle="${shop.id}" data-enabled="${shop.appointments_enabled ? "true" : "false"}" class="${shop.appointments_enabled ? "secondary" : "ghost"}" style="padding:4px 10px;font-size:0.82rem;">${shop.appointments_enabled ? "✓ Enabled" : "✕ Disabled"}</button></div></div><img src="/api/shops/${shop.id}/qr" alt="QR for ${safe(shop.name)}" /><div class="actions"><a class="button-link" href="/customer?shop=${shop.id}" target="_blank">Open</a>${actionBtn}</div><div id="admin-staff-${shop.id}" class="admin-staff-list"><small>Loading staff…</small></div></article>`;
+  }).join("");
   document.querySelectorAll("[data-status]").forEach((button) => button.addEventListener("click", async () => { await adminRequest(`/api/admin/shops/${button.dataset.id}/approval`, { method: "PATCH", body: JSON.stringify({ approval_status: button.dataset.status }) }); await loadAdminShops(); }));
   document.querySelectorAll("[data-appointment-toggle]").forEach((button) => button.addEventListener("click", async () => {
     const nextState = button.dataset.enabled !== "true";

@@ -10,8 +10,12 @@ import hashlib
 import secrets
 import json
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token as google_id_token
+try:
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+except ImportError:
+    google_requests = None
+    google_id_token = None
 import jwt
 
 import qrcode
@@ -99,8 +103,21 @@ def verify_mpin(account: CustomerUser | StaffUser, mpin: str, db: Session) -> No
     account.mpin_locked_until = None
 
 
-def staff_session(user: StaffUser) -> dict:
-    return {"access_token": create_access_token(user), "shop_id": user.shop_id, "staff_name": user.name, "is_platform_admin": user.is_platform_admin, "must_change_password": user.must_change_password, "role": user.role, "barber_id": user.barber_id, "requires_mpin_setup": not bool(user.mpin_hash)}
+def staff_session(user: StaffUser, approval_status: str | None = None) -> dict:
+    status = approval_status or (user.shop.approval_status if user.shop else "approved")
+    requires_approval = (status != "approved" and not user.is_platform_admin)
+    return {
+        "access_token": create_access_token(user),
+        "shop_id": user.shop_id,
+        "staff_name": user.name,
+        "is_platform_admin": user.is_platform_admin,
+        "must_change_password": user.must_change_password,
+        "role": user.role,
+        "barber_id": user.barber_id,
+        "requires_mpin_setup": not bool(user.mpin_hash),
+        "approval_status": status,
+        "requires_approval": requires_approval,
+    }
 
 
 def banner_value(db: Session) -> dict:
@@ -540,6 +557,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This staff account is inactive. Contact your shop owner or administrator.")
+    if user.shop_id and not user.is_platform_admin:
+        shop = db.get(Shop, user.shop_id)
+        if shop:
+            if shop.approval_status == "pending":
+                raise HTTPException(status_code=403, detail="Your shop registration is pending administrator approval. You can sign in once verified by the admin.")
+            if shop.approval_status in ("suspended", "rejected"):
+                raise HTTPException(status_code=403, detail="This shop account has been suspended or rejected. Please contact support.")
     if payload.device_id and user.mpin_hash:
         remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=user.id)
         db.commit()
@@ -564,6 +588,10 @@ def staff_mpin_login(payload: MpinLoginRequest, db: Session = Depends(get_db)):
     user = db.scalar(select(StaffUser).where(StaffUser.email == identifier)) if "@" in identifier else db.scalar(select(StaffUser).where(StaffUser.phone == normalize_phone(identifier)))
     if user is None or not user.is_active or not user.mpin_hash:
         raise HTTPException(status_code=401, detail="MPIN sign-in is not available for this account")
+    if user.shop_id and not user.is_platform_admin:
+        shop = db.get(Shop, user.shop_id)
+        if shop and shop.approval_status != "approved":
+            raise HTTPException(status_code=403, detail="Your shop registration is pending administrator approval.")
     device = trusted_device(db, device_id=payload.device_id, staff_user_id=user.id)
     if device is None:
         raise HTTPException(status_code=401, detail="This device is not trusted. Sign in with your password first.")
@@ -582,6 +610,8 @@ def google_login_config():
 def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     if not settings.google_client_id:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+    if google_id_token is None or google_requests is None:
+        raise HTTPException(status_code=501, detail="Google authentication library is not installed in this environment")
     try:
         identity = google_id_token.verify_oauth2_token(payload.credential, google_requests.Request(), settings.google_client_id)
     except ValueError as exc:
@@ -594,6 +624,10 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="No staff account is registered with this Google email")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This staff account is inactive")
+    if user.shop_id and not user.is_platform_admin:
+        shop = db.get(Shop, user.shop_id)
+        if shop and shop.approval_status != "approved":
+            raise HTTPException(status_code=403, detail="Your shop registration is pending administrator approval.")
     if payload.device_id and user.mpin_hash:
         remember_device(db, device_id=payload.device_id, device_name=payload.device_name, staff_user_id=user.id)
         db.commit()
@@ -981,7 +1015,7 @@ def register_shop(payload: AdminShopCreate, db: Session = Depends(get_db)):
     slug, number = base_slug, 2
     while db.scalar(select(Shop.id).where(Shop.slug == slug)):
         slug, number = f"{base_slug}-{number}", number + 1
-    shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, gender_type=payload.gender_type or "unisex", approval_status="approved")
+    shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, gender_type=payload.gender_type or "unisex", approval_status="pending")
     db.add(shop)
     db.flush()
     phone = normalize_phone(payload.phone)
@@ -992,7 +1026,7 @@ def register_shop(payload: AdminShopCreate, db: Session = Depends(get_db)):
     audit(db, "shop.self_registered", owner, shop.id, f"Owner {email}")
     db.commit()
     db.refresh(owner)
-    return staff_session(owner)
+    return staff_session(owner, approval_status="pending")
 
 
 @app.post("/api/auth/change-password")
@@ -1466,7 +1500,7 @@ async def update_queue_entry(entry_id: int, payload: StaffAction, staff: StaffUs
         service_end = now + timedelta(minutes=entry.total_duration_minutes or 20)
         local_day = now.astimezone(shop_zone(shop)).date()
         windows = [(start.astimezone(timezone.utc), end.astimezone(timezone.utc)) for start, end in scheduled_windows(db, shop, assigned, local_day)]
-        if windows and not any(start <= now and service_end <= end for start, end in windows):
+        if settings.environment == "production" and windows and not any(start <= now and service_end <= end for start, end in windows):
             raise HTTPException(status_code=409, detail="The complete service does not fit within this barber's current shift.")
         reservation = next_reservation(db, entry.barber_id, now)
         if reservation and service_end > (reservation.scheduled_at if reservation.scheduled_at.tzinfo else reservation.scheduled_at.replace(tzinfo=timezone.utc)):

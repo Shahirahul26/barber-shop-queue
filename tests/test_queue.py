@@ -140,6 +140,10 @@ def test_shop_self_registration_barber_permissions_and_appointment_conflict():
         assert session["role"] == "owner"
         auth = {"Authorization": f"Bearer {session['access_token']}"}
         shop_id = session["shop_id"]
+        # Maker-Checker: Admin approves the newly registered shop
+        admin = client.post("/api/auth/login", json={"email": "owner@example.com", "password": "ChangeMe123!"}).json()
+        approved = client.patch(f"/api/admin/shops/{shop_id}/approval", headers={"Authorization": f"Bearer {admin['access_token']}"}, json={"approval_status": "approved"})
+        assert approved.status_code == 200
 
         barber = client.post(f"/api/shops/{shop_id}/barbers", headers=auth, json={"name": "Asha"}).json()
         service = client.post(f"/api/shops/{shop_id}/services", headers=auth, json={"name": "Haircut", "duration_minutes": 30, "price_rupees": 300}).json()
