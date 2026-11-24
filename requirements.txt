@@ -14,4 +14,5 @@ pywebpush==2.0.3
 python-dotenv==1.0.1
 qrcode[pil]==8.0
 google-auth==2.38.0
+reportlab>=4.0.0
 

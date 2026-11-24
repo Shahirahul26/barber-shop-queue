@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrimTime — Executive Visiting Card</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cabinet+Grotesk:wght@800;900&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #061511;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      margin: 0;
+    }
+
+    h1, h2, h3, .font-heading {
+      font-family: 'Cabinet Grotesk', 'Plus Jakarta Sans', sans-serif;
+    }
+
+    /* 3D Flip Card Container */
+    .card-perspective {
+      perspective: 1200px;
+    }
+
+    .card-inner {
+      width: 580px;
+      height: 330px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.7s cubic-bezier(0.4, 0.2, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .card-inner.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .card-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 20px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .card-front {
+      background: linear-gradient(135deg, #0a251e 0%, #0f3d32 50%, #165b4c 100%);
+      color: white;
+      padding: 32px 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card-back {
+      background: #faf8f5;
+      color: #0f172a;
+      transform: rotateY(180deg);
+      padding: 28px 32px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid #e2e8f0;
+    }
+
+    .front-glow {
+      position: absolute;
+      top: -60px;
+      right: -60px;
+      width: 220px;
+      height: 220px;
+      background: radial-gradient(circle, rgba(226, 247, 82, 0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Print Setup */
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .card-perspective {
+        perspective: none;
+      }
+      .card-inner {
+        transform: none !important;
+        width: 3.5in !important;
+        height: 2in !important;
+        page-break-after: always;
+        margin: 20px auto;
+      }
+      .card-face {
+        position: static !important;
+        width: 100% !important;
+        height: 100% !important;
+        backface-visibility: visible !important;
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+      }
+      .card-back {
+        transform: none !important;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .card-inner {
+        width: 340px;
+        height: 200px;
+      }
+      .card-front, .card-back {
+        padding: 18px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls bar -->
+  <div class="no-print mb-8 text-center">
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-3">
+      <span>💳</span> Interactive Visiting Card · Click to Flip
+    </div>
+    <h1 class="text-3xl font-extrabold text-white mb-2">TrimTime Business Card</h1>
+    <p class="text-sm text-slate-400 mb-4">Front & Back ready for professional printing (3.5" × 2" Standard)</p>
+
+    <div class="flex items-center justify-center gap-3">
+      <button onclick="flipCard()" class="px-5 py-2 rounded-xl bg-[#e2f752] text-[#091e19] font-extrabold text-xs transition hover:bg-[#d4e942] flex items-center gap-2 shadow-lg">
+        <span>🔄</span> Flip Card (Front / Back)
+      </button>
+      <a href="/visiting-card/pdf" download="TrimTime_Visiting_Card.pdf" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition flex items-center gap-2 shadow-sm">
+        <span>📥</span> Download PDF
+      </a>
+      <button onclick="window.print()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition border border-white/20 flex items-center gap-2">
+        <span>🖨️</span> Print Card
+      </button>
+    </div>
+  </div>
+
+  <!-- The 3D Business Card -->
+  <div class="card-perspective">
+    <div class="card-inner" id="card" onclick="flipCard()">
+      
+      <!-- ================= FRONT FACE ================= -->
+      <div class="card-face card-front relative">
+        <div class="front-glow"></div>
+
+        <!-- Top Header: Brand & Category -->
+        <div class="flex justify-between items-start z-10">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-[#e2f752] text-[#091e19] font-black flex items-center justify-center text-xl shadow-md">
+              T
+            </div>
+            <div>
+              <div class="font-extrabold text-lg tracking-wider text-white">
+                TRIM<span class="text-[#e2f752]">TIME</span>
+              </div>
+              <p class="text-[0.65rem] text-emerald-300 uppercase tracking-widest font-semibold -mt-0.5">
+                Salon Queue & Chair OS
+              </p>
+            </div>
+          </div>
+          <div class="bg-black/30 backdrop-blur-sm border border-white/15 px-2.5 py-1 rounded-full text-[0.65rem] font-bold text-emerald-200">
+            Unisex · Men · Women
+          </div>
+        </div>
+
+        <!-- Middle: Tagline & Mission -->
+        <div class="my-auto z-10">
+          <h2 class="text-xl font-black text-white tracking-tight leading-snug">
+            Skip the waiting room.<br/>
+            <span class="text-[#e2f752]">Keep every chair full.</span>
+          </h2>
+          <p class="text-xs text-emerald-200/90 mt-1 max-w-sm">
+            Live QR queues · Smart chair gap monetization · 1-tap MPIN booking.
+          </p>
+        </div>
+
+        <!-- Bottom: Contact Details -->
+        <div class="flex justify-between items-end border-t border-white/15 pt-3 z-10">
+          <div>
+            <p class="text-xs font-black text-white">Rahul Kumar</p>
+            <p class="text-[0.68rem] text-emerald-300 font-medium">Product & Growth Lead</p>
+          </div>
+          <div class="text-right text-[0.68rem] text-emerald-100 font-medium space-y-0.5">
+            <p class="flex items-center justify-end gap-1.5">
+              <span>📞</span> <strong>+91 98765 43210</strong>
+            </p>
+            <p class="flex items-center justify-end gap-1.5 text-emerald-300">
+              <span>🌐</span> trimtime.in · get@trimtime.in
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= BACK FACE ================= -->
+      <div class="card-face card-back">
+        
+        <!-- Top Back: Dual Benefit Header -->
+        <div class="flex justify-between items-center border-b border-gray-200 pb-2.5">
+          <span class="text-xs font-black uppercase tracking-wider text-[#0f3d32]">Why TrimTime?</span>
+          <span class="text-[0.68rem] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+            Free 7-Day Salon Pilot
+          </span>
+        </div>
+
+        <!-- Middle Back: 2-Column Split (Owner vs Customer) -->
+        <div class="grid grid-cols-2 gap-4 my-auto py-2">
+          <!-- For Salons -->
+          <div class="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+            <p class="text-[0.68rem] font-extrabold text-emerald-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <span>💈</span> For Salon Owners:
+            </p>
+            <ul class="text-[0.62rem] text-slate-600 space-y-1 font-medium">
+              <li class="flex items-center gap-1">✓ Zero walk-away losses</li>
+              <li class="flex items-center gap-1">✓ Fills 20-min empty gaps</li>
+              <li class="flex items-center gap-1">✓ +₹30k–₹60k monthly profit</li>
+            </ul>
+          </div>
+
+          <!-- For Customers -->
+          <div class="bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+            <p class="text-[0.68rem] font-extrabold text-blue-800 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <span>👤</span> For Customers:
+            </p>
+            <ul class="text-[0.62rem] text-slate-600 space-y-1 font-medium">
+              <li class="flex items-center gap-1">✓ Live mobile wait clock</li>
+              <li class="flex items-center gap-1">✓ Zero sofa waiting</li>
+              <li class="flex items-center gap-1">✓ 1-tap 6-digit MPIN login</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Bottom Back: QR Code & CTA -->
+        <div class="flex items-center justify-between border-t border-gray-200 pt-2.5">
+          <div class="flex items-center gap-3">
+            <div class="w-14 h-14 bg-white p-1 rounded-lg border-2 border-[#0f3d32] flex items-center justify-center shrink-0">
+              <svg viewBox="0 0 24 24" class="w-full h-full text-[#0f3d32]" fill="currentColor">
+                <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm14 0h4v2h-4v-2zm-4 0h2v4h-2v-4zm2 4h4v2h-4v-2zm-2-4v-2h4v2h-4zm2-6h2v2h-2V8zm-6 2h2v2h-2v-2zm2 2h2v2h-2v-2zm-4 4h2v2h-2v-2zm0-6h2v2h-2V8zm2 2h2v2h-2v-2z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-[0.68rem] font-black text-gray-900 leading-tight">Scan for Live Demo</p>
+              <p class="text-[0.6rem] text-slate-500">Test the queue right on your phone</p>
+              <p class="text-[0.6rem] font-bold text-emerald-700 mt-0.5">app.trimtime.in/demo</p>
+            </div>
+          </div>
+
+          <div class="text-right">
+            <a href="/visiting-card/pdf" download="TrimTime_Visiting_Card.pdf" class="inline-block bg-[#0f3d32] hover:bg-[#165b4c] text-white text-[0.65rem] font-extrabold px-3 py-1.5 rounded-lg shadow-sm">
+              Save Card PDF ↓
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <div class="no-print mt-8 text-center text-xs text-slate-500">
+    Tip: Click the card anytime to see Front & Back. Click <strong>Download PDF</strong> to save the card.
+  </div>
+
+  <script>
+    function flipCard() {
+      document.getElementById('card').classList.toggle('flipped');
+    }
+  </script>
+</body>
+</html>

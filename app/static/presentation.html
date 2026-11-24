@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrimTime — Win-Win Salon Queue & Booking Presentation</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cabinet+Grotesk:wght@800;900&display=swap');
+    
+    :root {
+      --primary: #0f3d32;
+      --primary-light: #165b4c;
+      --emerald: #10b981;
+      --mint: #ecfdf5;
+      --accent: #e2f752;
+      --dark: #091e19;
+      --surface: #ffffff;
+      --cream: #faf8f5;
+      --slate: #475569;
+      --line: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #091e19;
+      color: #0f172a;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, .font-heading {
+      font-family: 'Cabinet Grotesk', 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .slide {
+      display: none;
+      min-height: 100vh;
+      width: 100%;
+      background: var(--cream);
+      box-sizing: border-box;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .slide.active {
+      display: flex;
+      flex-direction: column;
+      opacity: 1;
+    }
+
+    .deck-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 32px 40px;
+      box-sizing: border-box;
+    }
+
+    .benefit-card {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(15, 61, 50, 0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .benefit-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 40px rgba(15, 61, 50, 0.1);
+    }
+
+    .accent-tag {
+      background: #e2f752;
+      color: #091e19;
+      font-weight: 800;
+      font-size: 0.75rem;
+      padding: 4px 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background: white;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .slide {
+        display: flex !important;
+        opacity: 1 !important;
+        min-height: 100vh;
+        page-break-after: always;
+        break-after: page;
+        padding: 40px !important;
+      }
+      .deck-container {
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .deck-container {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <!-- Top Sticky Navigation & Action Controls -->
+  <header class="no-print fixed top-0 left-0 right-0 z-50 bg-[#091e19]/90 backdrop-blur-md border-b border-emerald-900/40 text-white px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-[#e2f752] text-[#091e19] font-black flex items-center justify-center text-lg">T</div>
+      <div>
+        <span class="font-extrabold text-sm tracking-wide">TRIM<span class="text-[#e2f752]">TIME</span></span>
+        <span class="text-xs text-emerald-400 block -mt-1 font-medium">Salon & Customer Deck</span>
+      </div>
+    </div>
+
+    <!-- Slide Indicators -->
+    <div class="flex items-center gap-2">
+      <span id="slide-num" class="text-xs font-mono font-bold text-emerald-300">Slide 1 / 8</span>
+      <div class="flex gap-1 ml-2" id="dots-container"></div>
+    </div>
+
+    <!-- Actions: Prev, Next, Download PDF -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <button onclick="prevSlide()" class="px-3 py-1.5 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-xs font-bold transition flex items-center gap-1">
+        <span>←</span> Prev
+      </button>
+      <button onclick="nextSlide()" class="px-3 py-1.5 rounded-lg bg-[#e2f752] hover:bg-[#d4e942] text-[#091e19] text-xs font-bold transition flex items-center gap-1">
+        Next <span>→</span>
+      </button>
+      <a href="/presentation/pdf" download="TrimTime_Presentation.pdf" title="Download exact PDF file to send on WhatsApp" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+        <span>📥</span> Download PDF
+      </a>
+      <button onclick="window.print()" title="Print slides" class="hidden sm:flex px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold transition items-center gap-1 border border-white/20">
+        <span>🖨️</span> Print
+      </button>
+    </div>
+  </header>
+
+  <main class="pt-14">
+    <!-- ========================================== -->
+    <!-- SLIDE 1: Title & Vision -->
+    <!-- ========================================== -->
+    <section class="slide active" id="slide-1">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="accent-tag">⚡ The Salon Operating System</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Presentation Deck</span>
+        </div>
+
+        <div class="my-auto py-12 text-center max-w-4xl mx-auto">
+          <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-[#0f3d32] font-bold text-xs uppercase tracking-wider mb-6">
+            <span>💈</span> No More Waiting Rooms · Zero Idle Chairs
+          </div>
+          <h1 class="text-5xl md:text-7xl font-extrabold text-[#091e19] tracking-tight leading-[1.08] mb-6">
+            Your salon is crowded.<br/>
+            <span class="text-[#10b981]">Why are you still losing money?</span>
+          </h1>
+          <p class="text-lg md:text-2xl text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed mb-10">
+            Discover how <strong>TrimTime</strong> connects shop owners and customers with live virtual queues, 1-tap MPIN booking, and automated chair gap monetization.
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto text-left">
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center text-2xl font-bold">✂️</div>
+              <div>
+                <p class="text-xs text-gray-400 font-bold uppercase">For Salons</p>
+                <p class="text-sm font-bold text-gray-900">+₹30k–₹60k Monthly Revenue</p>
+              </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-2xl font-bold">📱</div>
+              <div>
+                <p class="text-xs text-gray-400 font-bold uppercase">For Customers</p>
+                <p class="text-sm font-bold text-gray-900">0 Minutes Wasted on Sofas</p>
+              </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-2xl font-bold">⚡</div>
+              <div>
+                <p class="text-xs text-gray-400 font-bold uppercase">Tech Engine</p>
+                <p class="text-sm font-bold text-gray-900">Real-Time Smart Queue</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>TrimTime Technologies · Confidential</span>
+          <span>Press [→] on keyboard or click Next</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 2: The Two Big Problems -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-2">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">01 · The Reality</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Pain Point Breakdown</span>
+        </div>
+
+        <div class="my-auto py-8">
+          <p class="text-xs font-bold text-rose-600 uppercase tracking-wider mb-2">The Hidden Crisis</p>
+          <h2 class="text-3xl md:text-5xl font-black text-[#091e19] mb-4">Two sides of the same salon door. Both losing.</h2>
+          <p class="text-slate-600 text-base max-w-2xl mb-8">Every single weekend, traditional salons bleed revenue while customers suffer through archaic queueing.</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Salon Owner Pain -->
+            <div class="bg-white p-8 rounded-3xl border-2 border-rose-100 shadow-sm relative overflow-hidden">
+              <div class="absolute top-0 right-0 bg-rose-500 text-white font-bold text-xs px-4 py-1.5 rounded-bl-xl uppercase tracking-wider">
+                Shop Owner Nightmare
+              </div>
+              <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-2xl mb-4">🚪</div>
+              <h3 class="text-2xl font-bold text-gray-900 mb-3">The Walk-Away Bleed & Dead Gaps</h3>
+              <ul class="space-y-3 text-sm text-slate-600">
+                <li class="flex items-start gap-2.5">
+                  <span class="text-rose-500 font-bold">✕</span>
+                  <span><strong>30% Walk-in Abandonment:</strong> Customers peek in, see 4 people waiting, and walk straight to the next salon.</span>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="text-rose-500 font-bold">✕</span>
+                  <span><strong>Dead 25-Minute Chair Gaps:</strong> When an appointment is at 11:00 AM and current cut ends at 10:30 AM, 30 minutes sit idle. Barber earns ₹0.</span>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="text-rose-500 font-bold">✕</span>
+                  <span><strong>Phone Call Interruption:</strong> Scissors in hand, hands wet, answering calls to scribble manual appointments in paper registers.</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Customer Pain -->
+            <div class="bg-white p-8 rounded-3xl border-2 border-amber-100 shadow-sm relative overflow-hidden">
+              <div class="absolute top-0 right-0 bg-amber-500 text-white font-bold text-xs px-4 py-1.5 rounded-bl-xl uppercase tracking-wider">
+                Customer Frustration
+              </div>
+              <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl mb-4">🛋️</div>
+              <h3 class="text-2xl font-bold text-gray-900 mb-3">The Trapped Sofa Experience</h3>
+              <ul class="space-y-3 text-sm text-slate-600">
+                <li class="flex items-start gap-2.5">
+                  <span class="text-amber-500 font-bold">✕</span>
+                  <span><strong>Zero Wait Time Clarity:</strong> "Bhaiya kitna time lagega?" Barber answers "Bas 10 minute", which turns into 50 painful minutes.</span>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="text-amber-500 font-bold">✕</span>
+                  <span><strong>Trapped on a Cramped Sofa:</strong> Cannot leave to get a coffee or run errands because they will lose their turn.</span>
+                </li>
+                <li class="flex items-start gap-2.5">
+                  <span class="text-amber-500 font-bold">✕</span>
+                  <span><strong>No Gender or Service Choice:</strong> Awkward walk-ins into men-only or women-only salons without knowing upfront.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>Problem Validation</span>
+          <span>Slide 2 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 3: The Solution Overview -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-3">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">02 · The Solution</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Platform Overview</span>
+        </div>
+
+        <div class="my-auto py-8 text-center max-w-4xl mx-auto">
+          <span class="accent-tag mb-3">Meet TrimTime</span>
+          <h2 class="text-4xl md:text-5xl font-black text-[#091e19] mb-4">The Complete Dual-Sided Platform</h2>
+          <p class="text-slate-600 text-base max-w-2xl mx-auto mb-10">No app download required. One smart QR code connects the shop dashboard with every customer's phone instantly.</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            <div class="benefit-card">
+              <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center text-2xl font-bold mb-4">📱</div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">QR Live Virtual Queue</h3>
+              <p class="text-sm text-slate-600 leading-relaxed">Customers scan the door QR, see minute-by-minute wait times on mobile, join the queue, and walk in exactly when their chair is ready.</p>
+            </div>
+
+            <div class="benefit-card">
+              <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center text-2xl font-bold mb-4">⚡</div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Smart Chair Gap Filler</h3>
+              <p class="text-sm text-slate-600 leading-relaxed">System automatically detects open 20–30 min gaps between bookings and highlights short walk-in services to fit the gap. Zero dead time.</p>
+            </div>
+
+            <div class="benefit-card">
+              <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center text-2xl font-bold mb-4">🔒</div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">1-Tap 6-Digit MPIN</h3>
+              <p class="text-sm text-slate-600 leading-relaxed">No forgotten passwords or waiting for SMS OTPs. Returning customers and barbers log in securely in under 2 seconds on trusted devices.</p>
+            </div>
+          </div>
+
+          <div class="mt-8 inline-flex items-center gap-4 bg-emerald-950 text-white px-6 py-3 rounded-2xl text-xs font-semibold">
+            <span class="text-[#e2f752] font-black uppercase tracking-wider">New Feature</span>
+            <span>Shop Category Tagging: 🚻 Unisex · 💈 Men & Gents · 💇‍♀️ Women & Ladies with 1-tap customer filtering</span>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>Architecture & Features</span>
+          <span>Slide 3 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 4: Benefits for Barber Shop Owner -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-4">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">03 · Value for Salons</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Shopkeeper Benefits</span>
+        </div>
+
+        <div class="my-auto py-8">
+          <div class="flex flex-col md:flex-row md:items-end justify-between mb-8">
+            <div>
+              <p class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">Maximum Shop Productivity</p>
+              <h2 class="text-3xl md:text-5xl font-black text-[#091e19]">Why Salon Owners Love TrimTime</h2>
+            </div>
+            <div class="mt-4 md:mt-0 bg-emerald-100 text-emerald-900 font-extrabold px-4 py-2 rounded-xl text-sm">
+              Estimated Monthly Gain: +₹45,000 to ₹75,000
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">🚫</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Stops Walk-Away Losses</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Customers no longer leave your shop when chairs are full. They grab a digital token, shop nearby, and come back right on time.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">⚡</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Monetizes Dead Gaps</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">20-minute gap before next appointment? TrimTime slots a beard trim or quick haircut into the chair so barbers never sit idle.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">📱</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Eliminates Phone Chaos</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Customers book self-serve slots online. No more answering calls with scissors in hand or arguing over who came first.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">📊</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Staff & Revenue Analytics</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">See cuts performed per barber, customer ratings, peak rush hours, and daily collections in real-time from your mobile phone.</p>
+            </div>
+          </div>
+
+          <!-- Bottom Owner Proof -->
+          <div class="mt-8 bg-gradient-to-r from-[#0f3d32] to-[#165b4c] text-white p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+              <div class="text-4xl">💰</div>
+              <div>
+                <p class="font-bold text-base">The Math is Simple:</p>
+                <p class="text-xs text-emerald-200">Saving just 2 walk-in haircuts a day (₹250 each) + filling 1 dead gap per chair = ₹24,000+ extra monthly profit per chair!</p>
+              </div>
+            </div>
+            <div class="shrink-0">
+              <a href="/presentation/pdf" download="TrimTime_Presentation.pdf" class="px-4 py-2 rounded-xl bg-[#e2f752] text-[#091e19] font-black text-xs uppercase tracking-wider inline-block">
+                Download Full Pitch PDF
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>Shop Owner ROI</span>
+          <span>Slide 4 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 5: Benefits for the Customer -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-5">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">04 · Value for Customers</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Customer Experience</span>
+        </div>
+
+        <div class="my-auto py-8">
+          <div class="flex flex-col md:flex-row md:items-end justify-between mb-8">
+            <div>
+              <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">Zero Waiting Room Agony</p>
+              <h2 class="text-3xl md:text-5xl font-black text-[#091e19]">Why Customers Love TrimTime</h2>
+            </div>
+            <div class="mt-4 md:mt-0 bg-blue-100 text-blue-900 font-extrabold px-4 py-2 rounded-xl text-sm">
+              Average Time Saved: 38 Minutes / Visit
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">⏱️</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Real-Time Queue Clock</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">No guesswork. Phone shows exact position: "2 people ahead (~18 min)". Countdown updates live minute-by-minute.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">☕</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Freedom to Roam</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Leave the shop! Grab coffee, run groceries, or relax at home. Return only when notified that your turn is next.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">🔐</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Fast 6-Digit MPIN</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">No typing long passwords or waiting for SMS codes. Quick 6-digit PIN gets them into their queue ticket in 2 seconds.</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+              <span class="text-3xl mb-3 block">🚻</span>
+              <h3 class="text-lg font-bold text-gray-900 mb-2">Gender & Stylist Choice</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Filter salons by Unisex, Men, or Women. Pick your favourite barber or choose 'Any available' for fastest service.</p>
+            </div>
+          </div>
+
+          <!-- Bottom Customer Quote -->
+          <div class="mt-8 bg-blue-50 border border-blue-200 p-6 rounded-3xl flex items-center gap-5">
+            <div class="text-3xl">🌟</div>
+            <div>
+              <p class="text-sm font-bold text-blue-950">"I used to hate going for a haircut on Sundays because of the 45-minute wait. Now I join the queue from home, walk in when it says 5 minutes left, and sit straight in the chair!"</p>
+              <p class="text-xs text-blue-700 font-medium mt-1">— Rohit S., Verified Customer</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>Customer Delight</span>
+          <span>Slide 5 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 6: The Win-Win Magic: Smart Gap Monetizer -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-6">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">05 · Innovation Spotlight</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Smart Gap Monetization</span>
+        </div>
+
+        <div class="my-auto py-8">
+          <div class="text-center max-w-3xl mx-auto mb-8">
+            <span class="accent-tag mb-2">⚡ Patent-Pending Logic</span>
+            <h2 class="text-3xl md:text-5xl font-black text-[#091e19]">How We Monetize Dead Gaps</h2>
+            <p class="text-slate-600 text-sm max-w-xl mx-auto">Appointments are great, but the 20–30 minute gap between them is lost revenue. Here is how TrimTime turns dead time into cash:</p>
+          </div>
+
+          <div class="bg-white p-8 rounded-3xl border border-gray-200 shadow-sm max-w-4xl mx-auto">
+            <!-- Timeline Visual -->
+            <div class="space-y-4">
+              <div class="flex items-center justify-between text-xs font-bold text-gray-400 uppercase tracking-wider">
+                <span>10:30 AM (Cut Ends)</span>
+                <span class="text-emerald-600 font-extrabold bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">⚡ 25-Min Usable Gap Window</span>
+                <span>11:00 AM (Next Appointment)</span>
+              </div>
+
+              <!-- Bar Visual -->
+              <div class="h-14 rounded-2xl bg-gray-100 p-1.5 flex gap-2">
+                <div class="w-1/4 bg-gray-400 text-white rounded-xl flex items-center justify-center font-bold text-xs">
+                  Finished Cut (Done)
+                </div>
+                <div class="w-2/4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl flex items-center justify-center font-extrabold text-xs shadow-md animate-pulse">
+                  ⚡ 15-Min Beard Trim Fitted Here! (+₹150)
+                </div>
+                <div class="w-1/4 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-xs">
+                  Booked Appt (11:00 AM)
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-100">
+                <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-sm">1</div>
+                  <div>
+                    <h4 class="font-bold text-sm text-gray-900">Automatic Window Detection</h4>
+                    <p class="text-xs text-slate-600">The algorithm continuously calculates usable time between booked appointments, factoring in a 5-minute cleanup buffer.</p>
+                  </div>
+                </div>
+                <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-sm">2</div>
+                  <div>
+                    <h4 class="font-bold text-sm text-gray-900">Priority Badge in Queue</h4>
+                    <p class="text-xs text-slate-600">Short services (beard trims, head massages) are automatically badged with <strong>'⚡ Fits open chair gap'</strong> so the barber can claim them instantly.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>Gap Monetizer Logic</span>
+          <span>Slide 6 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 7: How It Works in 3 Steps -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-7">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">06 · Simple Flow</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">3-Step Operation</span>
+        </div>
+
+        <div class="my-auto py-8">
+          <div class="text-center max-w-3xl mx-auto mb-10">
+            <h2 class="text-3xl md:text-5xl font-black text-[#091e19]">So Simple, Anyone Can Use It</h2>
+            <p class="text-slate-600 text-sm">Zero training required. If your staff and customers use WhatsApp, they already know how to use TrimTime.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <div class="benefit-card text-center relative">
+              <div class="w-16 h-16 rounded-3xl bg-emerald-100 text-[#0f3d32] font-black text-2xl flex items-center justify-center mx-auto mb-4">1</div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Scan Door QR</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Customer scans the acrylic standee at the salon counter. No app download; opens instantly in Chrome or Safari.</p>
+              <span class="inline-block mt-4 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">Takes 5 Seconds</span>
+            </div>
+
+            <div class="benefit-card text-center relative">
+              <div class="w-16 h-16 rounded-3xl bg-amber-100 text-amber-900 font-black text-2xl flex items-center justify-center mx-auto mb-4">2</div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Track on Mobile</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Select haircut or combo. Live ticket issued (e.g. #A03). Follow the live countdown from anywhere without waiting on the sofa.</p>
+              <span class="inline-block mt-4 text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full">Complete Freedom</span>
+            </div>
+
+            <div class="benefit-card text-center relative">
+              <div class="w-16 h-16 rounded-3xl bg-blue-100 text-blue-900 font-black text-2xl flex items-center justify-center mx-auto mb-4">3</div>
+              <h3 class="text-xl font-bold text-gray-900 mb-2">Sit & Get Styled</h3>
+              <p class="text-xs text-slate-600 leading-relaxed">Arrive when notified. Barber taps 'Start', cuts hair, taps 'Complete'. Digital receipt & star rating prompt automatically sent.</p>
+              <span class="inline-block mt-4 text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-full">100% Satisfaction</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>Customer & Staff Flow</span>
+          <span>Slide 7 / 8</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- SLIDE 8: Call to Action & 7-Day Pilot -->
+    <!-- ========================================== -->
+    <section class="slide" id="slide-8">
+      <div class="deck-container">
+        <div class="flex justify-between items-center border-b border-gray-200 pb-4">
+          <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest font-mono">07 · Next Steps</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Get Started</span>
+        </div>
+
+        <div class="my-auto py-8 text-center max-w-3xl mx-auto">
+          <span class="accent-tag mb-4">Zero Risk · 100% Free Trial</span>
+          <h2 class="text-4xl md:text-6xl font-black text-[#091e19] mb-4">Try It This Weekend. Pay ₹0.</h2>
+          <p class="text-slate-600 text-base max-w-xl mx-auto mb-8">
+            We deliver and set up your shop's custom QR standee, staff logins, and service menu for free. If you don't save at least 5 walk-away customers this weekend, you pay nothing.
+          </p>
+
+          <div class="bg-white p-8 rounded-3xl border border-gray-200 shadow-lg text-left max-w-xl mx-auto mb-8">
+            <h3 class="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+              <span class="text-emerald-600">✓</span> What You Receive in 24 Hours:
+            </h3>
+            <ul class="space-y-3 text-sm text-slate-600">
+              <li class="flex items-center gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold">1</span>
+                <span>Custom Acrylic QR Standee for your Reception Desk</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold">2</span>
+                <span>Staff & Barber Tablet / Mobile Login accounts</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold">3</span>
+                <span>Digital Service Menu & Shop Category (Unisex/Men/Women)</span>
+              </li>
+              <li class="flex items-center gap-2.5">
+                <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-bold">4</span>
+                <span>Dedicated Onboarding Specialist to train your team (10 mins)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a href="tel:+919876543210" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#0f3d32] hover:bg-[#165b4c] text-white font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+              <span>📞</span> Call / WhatsApp for Free Setup
+            </a>
+            <a href="/presentation/pdf" download="TrimTime_Presentation.pdf" class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition flex items-center justify-center gap-2 shadow-sm">
+              <span>📥</span> Download Presentation PDF
+            </a>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center text-xs text-gray-400 border-t border-gray-200 pt-4">
+          <span>TrimTime · Ready to Launch</span>
+          <span>Slide 8 / 8</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 8;
+
+    function updateSlide() {
+      document.querySelectorAll('.slide').forEach((slide, idx) => {
+        slide.classList.toggle('active', idx + 1 === currentSlide);
+      });
+      document.getElementById('slide-num').textContent = `Slide ${currentSlide} / ${totalSlides}`;
+      
+      // Update dots
+      const dotsContainer = document.getElementById('dots-container');
+      dotsContainer.innerHTML = '';
+      for (let i = 1; i <= totalSlides; i++) {
+        const dot = document.createElement('div');
+        dot.className = `w-2 h-2 rounded-full transition cursor-pointer ${i === currentSlide ? 'bg-[#e2f752] w-5' : 'bg-emerald-900'}`;
+        dot.onclick = () => goToSlide(i);
+        dotsContainer.appendChild(dot);
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateSlide();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlide();
+      }
+    }
+
+    function goToSlide(n) {
+      currentSlide = n;
+      updateSlide();
+    }
+
+    // Keyboard support
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        prevSlide();
+      }
+    });
+
+    updateSlide();
+  </script>
+</body>
+</html>

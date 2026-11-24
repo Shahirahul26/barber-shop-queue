@@ -325,18 +325,27 @@ async def appointment_promotion_loop() -> None:
         await asyncio.sleep(15)
 
 
+def ensure_schema_compatibility(db_engine):
+    try:
+        from sqlalchemy import inspect, text
+        with db_engine.begin() as conn:
+            insp = inspect(conn)
+            if "shops" in insp.get_table_names():
+                cols = [c["name"] for c in insp.get_columns("shops")]
+                if "gender_type" not in cols:
+                    conn.execute(text("ALTER TABLE shops ADD COLUMN gender_type VARCHAR(20) DEFAULT 'unisex'"))
+                if "appointments_enabled" not in cols:
+                    conn.execute(text("ALTER TABLE shops ADD COLUMN appointments_enabled BOOLEAN DEFAULT TRUE"))
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     validate_production_settings()
+    ensure_schema_compatibility(engine)
     if settings.environment != "production":
         Base.metadata.create_all(bind=engine)
-        try:
-            with engine.begin() as conn:
-                cols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(shops)").fetchall()]
-                if "appointments_enabled" not in cols:
-                    conn.exec_driver_sql("ALTER TABLE shops ADD COLUMN appointments_enabled BOOLEAN DEFAULT 1")
-        except Exception:
-            pass
         seed_demo_data()
     promotion_task = asyncio.create_task(appointment_promotion_loop())
     try:
@@ -419,6 +428,26 @@ def manifest():
 @app.get("/sw.js", include_in_schema=False)
 def service_worker():
     return FileResponse(STATIC_DIR / "sw.js", media_type="application/javascript")
+
+
+@app.get("/presentation", include_in_schema=False)
+def presentation_page():
+    return FileResponse(STATIC_DIR / "presentation.html")
+
+
+@app.get("/visiting-card", include_in_schema=False)
+def visiting_card_page():
+    return FileResponse(STATIC_DIR / "visiting-card.html")
+
+
+@app.get("/presentation/pdf", include_in_schema=False)
+def presentation_pdf():
+    return FileResponse(STATIC_DIR / "TrimTime_Presentation.pdf", filename="TrimTime_Presentation.pdf", media_type="application/pdf")
+
+
+@app.get("/visiting-card/pdf", include_in_schema=False)
+def visiting_card_pdf():
+    return FileResponse(STATIC_DIR / "TrimTime_Visiting_Card.pdf", filename="TrimTime_Visiting_Card.pdf", media_type="application/pdf")
 
 
 @app.get("/api/platform/banner")
@@ -947,7 +976,7 @@ def register_shop(payload: AdminShopCreate, db: Session = Depends(get_db)):
     slug, number = base_slug, 2
     while db.scalar(select(Shop.id).where(Shop.slug == slug)):
         slug, number = f"{base_slug}-{number}", number + 1
-    shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, approval_status="approved")
+    shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, gender_type=payload.gender_type or "unisex", approval_status="approved")
     db.add(shop)
     db.flush()
     phone = normalize_phone(payload.phone)
@@ -1012,7 +1041,7 @@ def get_shop(shop_id: int, db: Session = Depends(get_db)):
     waiting = [item for item in active_queue(db, shop_id) if item.status == QueueStatus.WAITING]
     waits = estimated_waits(db, shop_id)
     ratings = [item.stars for item in shop.ratings]
-    return {"id": shop.id, "name": shop.name, "address": shop.address, "phone": shop.phone, "gst_number": shop.gst_number, "slug": shop.slug, "latitude": shop.latitude, "longitude": shop.longitude, "approval_status": shop.approval_status, "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0, "rating_count": len(ratings), "timezone": shop.timezone, "opens_at": shop.opens_at, "closes_at": shop.closes_at, "queue_paused": shop.queue_paused, "appointments_enabled": getattr(shop, "appointments_enabled", True), "photo_url": shop.photo_url, "waiting_count": len(waiting), "estimated_wait_minutes": max(waits.values(), default=0), "services": [item for item in shop.services if item.is_active], "barbers": [barber_view(db, item) for item in shop.barbers if item.is_active]}
+    return {"id": shop.id, "name": shop.name, "address": shop.address, "phone": shop.phone, "gst_number": shop.gst_number, "slug": shop.slug, "latitude": shop.latitude, "longitude": shop.longitude, "approval_status": shop.approval_status, "average_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0, "rating_count": len(ratings), "timezone": shop.timezone, "opens_at": shop.opens_at, "closes_at": shop.closes_at, "queue_paused": shop.queue_paused, "appointments_enabled": getattr(shop, "appointments_enabled", True), "photo_url": shop.photo_url, "gender_type": getattr(shop, "gender_type", "unisex") or "unisex", "waiting_count": len(waiting), "estimated_wait_minutes": max(waits.values(), default=0), "services": [item for item in shop.services if item.is_active], "barbers": [barber_view(db, item) for item in shop.barbers if item.is_active]}
 
 
 @app.get("/api/shops", response_model=list[ShopOut])
@@ -1696,7 +1725,7 @@ def admin_create_shop(payload: AdminShopCreate, staff: StaffUser = Depends(curre
     number = 2
     while db.scalar(select(Shop.id).where(Shop.slug == slug)):
         slug, number = f"{base_slug}-{number}", number + 1
-    shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, approval_status="approved")
+    shop = Shop(name=payload.name.strip(), slug=slug, address=payload.address.strip(), phone=payload.phone, gst_number=payload.gst_number, latitude=payload.latitude, longitude=payload.longitude, gender_type=payload.gender_type or "unisex", approval_status="approved")
     db.add(shop)
     db.flush()
     phone = normalize_phone(payload.phone)

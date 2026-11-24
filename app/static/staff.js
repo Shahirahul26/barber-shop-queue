@@ -597,7 +597,8 @@ document.querySelector("#registration-form").addEventListener("submit", async (e
   try {
     button.disabled = true; button.textContent = "Creating shop…";
     const latitude = document.querySelector("#register-latitude").value, longitude = document.querySelector("#register-longitude").value;
-    const response = await fetch("/api/auth/register-shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: document.querySelector("#register-shop-name").value.trim(), phone: document.querySelector("#register-phone").value.trim() || null, gst_number: document.querySelector("#register-gst").value.trim().toUpperCase() || null, address: document.querySelector("#register-address").value.trim(), latitude: latitude ? Number(latitude) : null, longitude: longitude ? Number(longitude) : null, owner_name: document.querySelector("#register-owner-name").value.trim(), owner_email: document.querySelector("#register-email").value.trim().toLowerCase(), owner_password: document.querySelector("#register-password").value, terms_accepted: document.querySelector("#register-terms").checked }) });
+    const genderType = document.querySelector("#register-gender-type")?.value || "unisex";
+    const response = await fetch("/api/auth/register-shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: document.querySelector("#register-shop-name").value.trim(), phone: document.querySelector("#register-phone").value.trim() || null, gst_number: document.querySelector("#register-gst").value.trim().toUpperCase() || null, address: document.querySelector("#register-address").value.trim(), latitude: latitude ? Number(latitude) : null, longitude: longitude ? Number(longitude) : null, gender_type: genderType, owner_name: document.querySelector("#register-owner-name").value.trim(), owner_email: document.querySelector("#register-email").value.trim().toLowerCase(), owner_password: document.querySelector("#register-password").value, terms_accepted: document.querySelector("#register-terms").checked }) });
     const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(formatApiError(body.detail));
     document.querySelector("#registration-panel").classList.add("hidden"); message("Shop created successfully"); acceptSession(body, document.querySelector("#register-email").value.trim().toLowerCase());
   } catch (reason) { error.textContent = reason.message; }
@@ -779,7 +780,10 @@ if (staffServiceToggle && staffServiceOptions) {
 }
 
 function fillShopForm() {
-  document.querySelector("#shop-profile-name").value = shop.name; document.querySelector("#shop-phone").value = shop.phone || "";
+  document.querySelector("#shop-profile-name").value = shop.name;
+  const genderEl = document.querySelector("#shop-profile-gender-type");
+  if (genderEl) genderEl.value = shop.gender_type || "unisex";
+  document.querySelector("#shop-phone").value = shop.phone || "";
   document.querySelector("#shop-gst").value = shop.gst_number || ""; document.querySelector("#shop-profile-address").value = shop.address;
   const latEl = document.querySelector("#shop-profile-latitude");
   if (latEl) latEl.value = (shop.latitude !== null && shop.latitude !== undefined) ? shop.latitude : "";
@@ -983,6 +987,7 @@ document.querySelector("#shop-form").addEventListener("submit", async (event) =>
   event.preventDefault();
   const latVal = document.querySelector("#shop-profile-latitude")?.value?.trim();
   const lngVal = document.querySelector("#shop-profile-longitude")?.value?.trim();
+  const genderVal = document.querySelector("#shop-profile-gender-type")?.value || "unisex";
   await request(`/api/shops/${shopId}`, {
     method: "PATCH",
     body: JSON.stringify({
@@ -990,6 +995,7 @@ document.querySelector("#shop-form").addEventListener("submit", async (event) =>
       phone: document.querySelector("#shop-phone").value || null,
       gst_number: document.querySelector("#shop-gst").value.toUpperCase() || null,
       address: document.querySelector("#shop-profile-address").value,
+      gender_type: genderVal,
       latitude: latVal ? Number(latVal) : null,
       longitude: lngVal ? Number(lngVal) : null,
       opens_at: document.querySelector("#opens-at").value,

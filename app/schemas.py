@@ -249,6 +249,7 @@ class ShopOut(BaseModel):
     queue_paused: bool
     appointments_enabled: bool = True
     photo_url: str | None
+    gender_type: str = "unisex"
     waiting_count: int
     estimated_wait_minutes: int
     services: list[ServiceOut]
@@ -269,6 +270,7 @@ class ShopUpdate(BaseModel):
     closes_at: str = Field(pattern="^([01][0-9]|2[0-3]):[0-5][0-9]$")
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    gender_type: str | None = Field(default="unisex", pattern="^(unisex|men|women)$")
 
 
 class BannerUpdate(BaseModel):
@@ -351,6 +353,7 @@ class AdminShopCreate(BaseModel):
     gst_number: str | None = Field(default=None, min_length=15, max_length=15, pattern="^[0-9A-Z]{15}$")
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
+    gender_type: str | None = Field(default="unisex", pattern="^(unisex|men|women)$")
     owner_name: str = Field(min_length=2, max_length=100)
     owner_email: EmailStr
     owner_password: str = Field(min_length=8, max_length=128)

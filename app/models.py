@@ -37,6 +37,7 @@ class Shop(Base):
     queue_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     appointments_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     photo_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    gender_type: Mapped[str] = mapped_column(String(20), default="unisex")
     appointment_grace_minutes: Mapped[int] = mapped_column(Integer, default=10)
     cleanup_buffer_minutes: Mapped[int] = mapped_column(Integer, default=0)
     founding_barber_profile_id: Mapped[int | None] = mapped_column(ForeignKey("barber_profiles.id", use_alter=True), nullable=True)

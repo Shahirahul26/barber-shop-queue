@@ -781,11 +781,27 @@ async function selectAndShowShop(targetShopId, options = {}) {
   }
 }
 
+let currentGenderFilter = "all";
+
+function formatShopGenderBadge(genderType) {
+  const type = (genderType || "unisex").toLowerCase();
+  if (type === "men") {
+    return '<span class="shop-gender-badge men" title="Men & Gents">💈 Men &amp; Gents</span>';
+  }
+  if (type === "women") {
+    return '<span class="shop-gender-badge women" title="Women & Ladies">💇‍♀️ Women &amp; Ladies</span>';
+  }
+  return '<span class="shop-gender-badge unisex" title="Unisex - All genders welcome">🚻 Unisex</span>';
+}
+
 function renderShopCards(shops, showAll = false) {
   const cards = document.querySelector("#nearby-shop-cards");
-  const displayShops = showAll ? shops : shops.filter((item) => item.id !== shopId);
+  let displayShops = showAll ? shops : shops.filter((item) => item.id !== shopId);
+  if (currentGenderFilter !== "all") {
+    displayShops = displayShops.filter((item) => (item.gender_type || "unisex").toLowerCase() === currentGenderFilter);
+  }
   if (!displayShops.length) {
-    cards.innerHTML = '<p class="muted">No other shops are currently available.</p>';
+    cards.innerHTML = '<p class="muted">No shops match the selected category.</p>';
     return;
   }
   cards.innerHTML = displayShops.map((item) => {
@@ -795,7 +811,7 @@ function renderShopCards(shops, showAll = false) {
     const bookButtonHtml = item.appointments_enabled !== false
       ? `<button type="button" data-book-shop="${item.id}" class="secondary">Book appointment</button>`
       : "";
-    return `<article class="shop-market-card clickable-shop-card" data-shop-id="${item.id}" tabindex="0" role="button" aria-label="View ${escapeHtml(item.name)} details">${item.photo_url ? `<img src="${item.photo_url}" alt="${escapeHtml(item.name)}" />` : '<div class="shop-card-placeholder">TRIMTIME</div>'}<div class="shop-market-content"><div class="shop-card-header"><h3>${escapeHtml(item.name)}</h3><span class="view-details-pill">View shop ›</span></div><p class="shop-rating-summary">${ratingSummary(item)}</p><p>${escapeHtml(item.address)}</p><small>${item.opens_at}–${item.closes_at} · ${item.waiting_count} waiting · ${item.estimated_wait_minutes} estimated minutes</small><p class="card-services">${(item.services || []).slice(0, 3).map((service) => `${escapeHtml(service.name)} ₹${service.price_rupees}`).join(" · ")}</p><div class="actions"><button type="button" data-open-shop="${item.id}">Join live queue</button>${bookButtonHtml}<a href="https://www.google.com/maps/dir/?api=1&destination=${dest}" target="_blank" rel="noopener" class="card-direction-btn" title="Navigate with Google Maps" onclick="event.stopPropagation()">🧭 Directions</a></div></div></article>`;
+    return `<article class="shop-market-card clickable-shop-card" data-shop-id="${item.id}" tabindex="0" role="button" aria-label="View ${escapeHtml(item.name)} details">${item.photo_url ? `<img src="${item.photo_url}" alt="${escapeHtml(item.name)}" />` : '<div class="shop-card-placeholder">TRIMTIME</div>'}<div class="shop-market-content"><div class="shop-card-header"><div class="shop-card-title-wrap"><h3>${escapeHtml(item.name)}</h3>${formatShopGenderBadge(item.gender_type)}</div><span class="view-details-pill">View shop ›</span></div><p class="shop-rating-summary">${ratingSummary(item)}</p><p>${escapeHtml(item.address)}</p><small>${item.opens_at}–${item.closes_at} · ${item.waiting_count} waiting · ${item.estimated_wait_minutes} estimated minutes</small><p class="card-services">${(item.services || []).slice(0, 3).map((service) => `${escapeHtml(service.name)} ₹${service.price_rupees}`).join(" · ")}</p><div class="actions"><button type="button" data-open-shop="${item.id}">Join live queue</button>${bookButtonHtml}<a href="https://www.google.com/maps/dir/?api=1&destination=${dest}" target="_blank" rel="noopener" class="card-direction-btn" title="Navigate with Google Maps" onclick="event.stopPropagation()">🧭 Directions</a></div></div></article>`;
   }).join("");
 
   cards.querySelectorAll(".clickable-shop-card").forEach((card) => {
@@ -858,6 +874,11 @@ async function loadShop() {
   const previousShopId = currentShop?.id, previousAppointmentServices = selectedAppointmentServiceIds();
   currentShop = await api(`/api/shops/${shopId}`);
   document.querySelector("#shop-name").textContent = currentShop.name;
+  const genderBadge = document.querySelector("#shop-gender-badge");
+  if (genderBadge) {
+    genderBadge.innerHTML = formatShopGenderBadge(currentShop.gender_type);
+    genderBadge.classList.remove("hidden");
+  }
   document.querySelector("#shop-average-rating").textContent = ratingSummary(currentShop);
   document.querySelector("#shop-address").textContent = `${currentShop.address} · ${currentShop.opens_at}–${currentShop.closes_at}`;
   const navLink = document.querySelector("#shop-navigation-link");
@@ -1348,6 +1369,15 @@ document.querySelector("#nearby-shops")?.addEventListener("click", () => {
       renderShopCards(allShops, false);
     }
   }, () => document.querySelector("#form-error").textContent = "Location permission is needed to find nearby shops.");
+});
+
+document.querySelectorAll("#shop-filter-bar [data-gender-filter]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("#shop-filter-bar [data-gender-filter]").forEach((b) => b.classList.remove("active"));
+    button.classList.add("active");
+    currentGenderFilter = button.dataset.genderFilter;
+    renderShopCards(allShops, !shopId);
+  });
 });
 
 let liveWaitTimer = null;
