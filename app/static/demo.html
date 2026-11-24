@@ -71,6 +71,103 @@
       font-weight: 800;
       border-color: #e2f752;
     }
+
+    /* Software Window Mockup Styles */
+    .software-window {
+      background: #0b1e19;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+      text-align: left;
+    }
+    .mock-browser-bar {
+      background: #061511;
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .mock-dots {
+      display: flex;
+      gap: 5px;
+    }
+    .mock-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    .mock-url {
+      background: #0b1e19;
+      border-radius: 6px;
+      padding: 3px 12px;
+      font-size: 0.68rem;
+      font-family: monospace;
+      color: #94a3b8;
+      flex: 1;
+      max-width: 340px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .mock-panel {
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+    .mock-input {
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      color: #0f172a;
+      width: 100%;
+      outline: none;
+      box-sizing: border-box;
+      font-weight: 600;
+    }
+    .mock-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #475569;
+      display: block;
+      margin-bottom: 3px;
+    }
+    .mock-nav-tab {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #475569;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 85px;
+    }
+    .mock-nav-tab.active {
+      background: #0f3d32 !important;
+      color: #ffffff !important;
+      border-color: #0f3d32 !important;
+      box-shadow: 0 4px 12px rgba(15, 61, 50, 0.25);
+    }
+    .mock-sub-tab {
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-size: 0.68rem;
+      font-weight: 700;
+    }
+    .mock-sub-tab.active {
+      background: #0f3d32;
+      color: #ffffff;
+      border-color: #0f3d32;
+    }
   </style>
 </head>
 <body class="antialiased selection:bg-[#e2f752] selection:text-[#091e19]">
@@ -140,176 +237,432 @@
         <source src="/static/demo.mp4" type="video/mp4" />
       </video>
 
-      <!-- Interactive Scene Simulator -->
-      <div id="simulation-screen" class="py-6 sm:py-8 min-h-[420px] sm:min-h-[480px] flex flex-col justify-center">
+      <!-- Interactive Scene Simulator: Real TrimTime Software Screens -->
+      <div id="simulation-screen" class="py-4 sm:py-6 min-h-[460px] sm:min-h-[500px] flex flex-col justify-center">
         
-        <!-- SCENE 1: Shop Registration (Maker-Checker) -->
+        <!-- SCENE 1: Real Shop Registration Screen -->
         <div class="scene active" id="scene-1">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
-            <span class="text-4xl block mb-2">📝💈🛡️</span>
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 1 · 1-Minute Shop Registration</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Shopkeeper registers shop in 60 seconds</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Enter shop name, select shop category (<strong>Unisex / Men / Women</strong>), set Google Maps location and owner credentials.
-            </p>
-            <div class="bg-gradient-to-r from-emerald-950/90 to-[#0f3d32] border border-emerald-500/40 p-4 rounded-xl text-left max-w-md mx-auto space-y-2.5">
-              <div class="flex justify-between items-center text-xs">
-                <span class="text-emerald-300 font-bold">SHOP CATEGORY:</span>
-                <span class="text-xs font-extrabold text-[#e2f752] bg-emerald-900/80 px-2.5 py-0.5 rounded-md border border-emerald-600/40">🚻 Unisex Salon (All Genders)</span>
-              </div>
-              <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
-                <span class="text-amber-300 font-bold flex items-center gap-1.5">
-                  <span>⏳</span> Maker-Checker Security
-                </span>
-                <span class="text-amber-200 text-[0.7rem] font-semibold">Pending Admin Approval</span>
-              </div>
-              <p class="text-[0.72rem] text-slate-300 leading-snug">
-                Protects the marketplace: platform admin verifies shop details before it goes live, ensuring only genuine salons onboard.
-              </p>
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/staff?auth=register</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 1 · Registration</span>
             </div>
-          </div>
-        </div>
-
-        <!-- SCENE 2: Admin Approval & Staff MPIN Login -->
-        <div class="scene" id="scene-2">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
-            <span class="text-4xl block mb-2">⚡🔑📱</span>
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 2 · Admin Approval & Fast MPIN Sign In</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Admin approves · Staff logs in with 6-digit MPIN</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Admin activates the salon with 1 tap. Barbers and stylists sign in in 2 seconds on mobile or tablet using their 6-digit MPIN.
-            </p>
-            <div class="bg-black/60 border border-emerald-500/30 p-4 rounded-xl text-left max-w-md mx-auto space-y-3">
-              <div class="flex items-center justify-between text-xs pb-2 border-b border-white/10">
-                <span class="text-emerald-400 font-bold flex items-center gap-1"><span>✓</span> Verified by Admin</span>
-                <span class="text-emerald-300 text-[0.7rem] bg-emerald-950 px-2 py-0.5 rounded font-mono">APPROVED</span>
-              </div>
-              <div class="text-center py-1">
-                <p class="text-[0.7rem] text-slate-400 font-bold uppercase tracking-wider mb-2">Enter Barber MPIN</p>
-                <div class="flex justify-center gap-2">
-                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
-                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
-                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
-                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
-                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
-                  <span class="w-8 h-10 rounded-lg bg-emerald-900/60 border border-emerald-400 text-white font-mono text-lg flex items-center justify-center font-black">●</span>
+            <div class="p-4 sm:p-6 bg-[#0f2e24]">
+              <div class="mock-panel max-w-xl mx-auto">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[0.65rem] font-extrabold uppercase tracking-widest text-[#0f3d32] bg-emerald-100 px-2.5 py-0.5 rounded-full">New Shop Onboarding</span>
+                  <span class="text-[0.65rem] text-slate-500">Time: ~60 secs</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-black text-[#0f3d32] leading-tight">Register your shop</h3>
+                <p class="text-[0.68rem] text-slate-500 mb-3">Create your shop page, owner login and unique customer QR.</p>
+                
+                <div class="space-y-2 text-left">
+                  <div>
+                    <label class="mock-label">Shop name *</label>
+                    <input class="mock-input" value="Royal Crown Unisex Lounge" readonly />
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label class="mock-label">Shop type (genders served) *</label>
+                      <div class="mock-input flex items-center justify-between bg-emerald-50 border-emerald-300 font-bold text-[#065f46]">
+                        <span>🚻 Unisex (Men & Women)</span>
+                        <span class="text-xs">▾</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="mock-label">Phone *</label>
+                      <input class="mock-input" value="+91 98765 43210" readonly />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="mock-label">Address *</label>
+                    <input class="mock-input" value="Shop 4, Linking Road, Bandra West, Mumbai" readonly />
+                  </div>
+                  <div class="flex items-center gap-1.5 py-1">
+                    <span class="text-[0.62rem] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded font-bold text-slate-700">📍 Auto-detected GPS</span>
+                    <span class="text-[0.62rem] text-emerald-700 font-semibold font-mono">19.0596° N, 72.8295° E</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label class="mock-label">Owner name *</label>
+                      <input class="mock-input" value="Rahul Sharma" readonly />
+                    </div>
+                    <div>
+                      <label class="mock-label">Email *</label>
+                      <input class="mock-input" value="rahul@royalcrown.in" readonly />
+                    </div>
+                  </div>
+                  <div class="pt-2">
+                    <button class="w-full py-2.5 rounded-xl bg-[#0f3d32] text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2">
+                      <span>Create shop and sign in</span> <span>→</span>
+                    </button>
+                  </div>
+                  <div class="p-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-[0.65rem] font-semibold flex items-center gap-2">
+                    <span class="text-sm">⏳</span>
+                    <span><strong>Maker-Checker Concept:</strong> Registration submitted! Shop status set to <em>Pending Verification</em> until platform admin approves.</span>
+                  </div>
                 </div>
               </div>
-              <p class="text-center text-xs text-emerald-300 font-semibold">Instant login · No password required during busy shifts!</p>
             </div>
           </div>
         </div>
 
-        <!-- SCENE 3: Add Staff & Services -->
+        <!-- SCENE 2: Real Admin Maker-Checker Approval & Staff Fast MPIN Sign-In -->
+        <div class="scene" id="scene-2">
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/admin ➔ /staff</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 2 · Verification & Login</span>
+            </div>
+            <div class="p-4 sm:p-5 bg-[#0f2e24] space-y-3">
+              <!-- Part A: Admin Verification Panel -->
+              <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 text-slate-800">
+                <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-black uppercase tracking-wider text-slate-700">TrimTime Admin Portal</span>
+                    <span class="text-[0.65rem] bg-amber-100 text-amber-800 font-extrabold px-2 py-0.5 rounded-full border border-amber-300">
+                      ⏳ PENDING ADMIN APPROVAL
+                    </span>
+                  </div>
+                  <span class="text-[0.65rem] text-slate-400 font-mono">Shop #104</span>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 class="font-extrabold text-sm text-[#0f3d32]">Royal Crown Unisex Lounge</h4>
+                    <p class="text-[0.68rem] text-slate-500">Category: <strong>UNISEX (All Genders)</strong> · Bandra West</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button class="px-3 py-1.5 rounded-lg bg-[#0f3d32] text-white font-extrabold text-[0.7rem] shadow-sm flex items-center gap-1">
+                      <span>Approve Shop ✓</span>
+                    </button>
+                    <span class="text-[0.65rem] text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded">✓ Verified</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Part B: Staff Fast MPIN Sign In -->
+              <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 text-slate-800 text-center max-w-md mx-auto">
+                <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#0f3d32] text-[0.65rem] font-bold mb-2">
+                  <span>🏪</span> Royal Crown Lounge · Rahul Sharma (Owner)
+                </div>
+                <h4 class="font-extrabold text-sm text-[#0f3d32] mb-1">Enter 6-Digit Shift MPIN</h4>
+                <p class="text-[0.65rem] text-slate-500 mb-3">Fast 2-second tablet login · No passwords needed during busy rush</p>
+                <div class="flex justify-center gap-2 mb-3">
+                  <span class="w-8 h-9 rounded-lg bg-emerald-50 border-2 border-[#0f3d32] text-[#0f3d32] font-black text-base flex items-center justify-center">●</span>
+                  <span class="w-8 h-9 rounded-lg bg-emerald-50 border-2 border-[#0f3d32] text-[#0f3d32] font-black text-base flex items-center justify-center">●</span>
+                  <span class="w-8 h-9 rounded-lg bg-emerald-50 border-2 border-[#0f3d32] text-[#0f3d32] font-black text-base flex items-center justify-center">●</span>
+                  <span class="w-8 h-9 rounded-lg bg-emerald-50 border-2 border-[#0f3d32] text-[#0f3d32] font-black text-base flex items-center justify-center">●</span>
+                  <span class="w-8 h-9 rounded-lg bg-emerald-50 border-2 border-[#0f3d32] text-[#0f3d32] font-black text-base flex items-center justify-center">●</span>
+                  <span class="w-8 h-9 rounded-lg bg-emerald-50 border-2 border-[#0f3d32] text-[#0f3d32] font-black text-base flex items-center justify-center">●</span>
+                </div>
+                <button class="w-full py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-extrabold text-xs shadow-md">
+                  Sign in to Dashboard →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 3: Real Dashboard & Services/Staff Setup -->
         <div class="scene" id="scene-3">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-blue-500/30 text-center">
-            <span class="text-4xl block mb-2">👥✂️🏷️</span>
-            <span class="text-xs font-bold text-blue-400 uppercase tracking-widest bg-blue-950/70 px-3 py-1 rounded-full border border-blue-800">Scene 3 · Team & Service Catalog</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Set up stylists, service prices & durations</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Add your barbers with custom specialties and configure your full service menu with exact time slots so waiting estimates are 100% accurate.
-            </p>
-            <div class="grid grid-cols-2 gap-2.5 max-w-md mx-auto text-left text-xs">
-              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span class="text-slate-400 text-[0.68rem] font-bold block mb-1">STYLING TEAM</span>
-                <p class="text-white font-bold">Rahul · <span class="text-emerald-400 font-normal">Master Stylist</span></p>
-                <p class="text-white font-bold mt-1">Priya · <span class="text-emerald-400 font-normal">Color Specialist</span></p>
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/staff#services</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 3 · Services & Team</span>
+            </div>
+            <div class="p-4 sm:p-5 bg-[#0f2e24]">
+              <!-- Mock Top Navigation Tabs -->
+              <div class="grid grid-cols-4 gap-2 mb-3">
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">0 in queue</span><span>Live queue</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">0 today</span><span>Appointments</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Desk</span><span>Generate token</span></div>
+                <div class="mock-nav-tab active"><span class="text-[0.62rem] text-emerald-300">Staff OS</span><span>My account</span></div>
               </div>
-              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
-                <span class="text-slate-400 text-[0.68rem] font-bold block mb-1">MENU & PRICING</span>
-                <p class="text-white font-bold">Haircut <span class="text-emerald-300 font-normal">(25m · ₹250)</span></p>
-                <p class="text-white font-bold mt-1">Beard Trim <span class="text-emerald-300 font-normal">(15m · ₹150)</span></p>
+              <!-- Mock Sub Navigation -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1 mb-3">
+                <span class="mock-sub-tab active">Services</span>
+                <span class="mock-sub-tab">Team & staff</span>
+                <span class="mock-sub-tab">Analytics</span>
+                <span class="mock-sub-tab">Settings</span>
+                <span class="mock-sub-tab">Shop details & QR</span>
+              </div>
+              <!-- Real Services Table Content -->
+              <div class="mock-panel space-y-2">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                  <h4 class="font-extrabold text-xs text-[#0f3d32]">Active Service Menu (3 Services)</h4>
+                  <button class="px-2.5 py-1 rounded bg-[#0f3d32] text-white text-[0.65rem] font-bold">+ Add Service</button>
+                </div>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <div>
+                      <span class="font-bold text-slate-900 block">Classic Haircut & Wash</span>
+                      <span class="text-[0.65rem] text-slate-500">Duration: 25 mins · Assigned: All Stylists</span>
+                    </div>
+                    <span class="font-extrabold text-[#0f3d32] text-sm">₹250</span>
+                  </div>
+                  <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <div>
+                      <span class="font-bold text-slate-900 block">Beard Sculpting & Hot Towel</span>
+                      <span class="text-[0.65rem] text-slate-500">Duration: 15 mins · Assigned: All Stylists</span>
+                    </div>
+                    <span class="font-extrabold text-[#0f3d32] text-sm">₹150</span>
+                  </div>
+                  <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    <div>
+                      <span class="font-bold text-slate-900 block">Luxury Hair Spa & Deep Conditioning</span>
+                      <span class="text-[0.65rem] text-slate-500">Duration: 45 mins · Assigned: Priya Patel</span>
+                    </div>
+                    <span class="font-extrabold text-[#0f3d32] text-sm">₹600</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- SCENE 4: Generate Walk-in Token -->
+        <!-- SCENE 4: Real Front-Desk Walk-in Token Generator -->
         <div class="scene" id="scene-4">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-[#e2f752]/40 text-center">
-            <span class="text-4xl block mb-2">🎫🚶‍♂️⏱️</span>
-            <span class="text-xs font-bold text-[#e2f752] uppercase tracking-widest bg-[#e2f752]/10 px-3 py-1 rounded-full border border-[#e2f752]/30">Scene 4 · Desk Walk-in Token Generator</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer walks in without smartphone? No problem!</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Front desk enters customer name, multi-selects desired services, assigns a barber, and prints or generates an instant queue token.
-            </p>
-            <div class="bg-gradient-to-r from-emerald-950/90 to-[#0f3d32] border border-[#e2f752] p-4 rounded-xl text-left max-w-md mx-auto space-y-2">
-              <div class="flex justify-between items-center">
-                <span class="text-xs font-bold text-white">Customer: <strong>Amit Sharma</strong></span>
-                <span class="px-2.5 py-0.5 rounded-lg bg-[#e2f752] text-[#091e19] font-black text-sm">#A01</span>
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/staff#walkin</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 4 · Walk-in Desk Token</span>
+            </div>
+            <div class="p-4 sm:p-5 bg-[#0f2e24]">
+              <!-- Mock Top Navigation Tabs -->
+              <div class="grid grid-cols-4 gap-2 mb-3">
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">1 in queue</span><span>Live queue</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">0 today</span><span>Appointments</span></div>
+                <div class="mock-nav-tab active"><span class="text-[0.62rem] text-emerald-300">Desk</span><span>Generate token</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Staff OS</span><span>My account</span></div>
               </div>
-              <p class="text-xs text-emerald-200">Services: <strong>Haircut + Beard Trim (40 mins · ₹400)</strong></p>
-              <div class="flex items-center justify-between text-[0.72rem] text-slate-300 pt-1 border-t border-white/10">
-                <span>Stylist: <strong>Rahul (Assigned)</strong></span>
-                <span class="text-[#e2f752] font-bold">Estimated wait: ~12 mins</span>
+              <!-- Real Walk-in Token Form -->
+              <div class="mock-panel space-y-2.5">
+                <div>
+                  <span class="text-[0.62rem] font-black text-emerald-700 uppercase tracking-widest block">FRONT DESK COUNTER</span>
+                  <h4 class="font-black text-sm text-[#0f3d32]">Generate walk-in token</h4>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                  <div>
+                    <label class="mock-label">Customer name *</label>
+                    <input class="mock-input" value="Suresh Mehta" readonly />
+                  </div>
+                  <div>
+                    <label class="mock-label">Phone number</label>
+                    <input class="mock-input" value="98765 88990" readonly />
+                  </div>
+                </div>
+                <div class="text-left">
+                  <label class="mock-label">Select services (multiple allowed) *</label>
+                  <div class="p-2 rounded-lg bg-emerald-50 border border-emerald-300 space-y-1 text-xs">
+                    <label class="flex items-center gap-2 font-bold text-slate-800">
+                      <input type="checkbox" checked readonly class="accent-[#0f3d32]" />
+                      <span>Classic Haircut (25 mins · ₹250)</span>
+                    </label>
+                    <label class="flex items-center gap-2 font-bold text-slate-800">
+                      <input type="checkbox" checked readonly class="accent-[#0f3d32]" />
+                      <span>Beard Sculpting (15 mins · ₹150)</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span>2 services selected · 40 mins</span>
+                  <span class="text-[#0f3d32] font-black text-sm">Total: ₹400</span>
+                </div>
+                <button class="w-full py-2.5 rounded-xl bg-[#0f3d32] text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2">
+                  <span>Generate token & add to live queue</span> <span>→</span>
+                </button>
+                <div class="p-2 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center justify-between">
+                  <span>✓ Token #A01 Generated</span>
+                  <span class="bg-[#0f3d32] text-white px-2 py-0.5 rounded text-[0.65rem]">Chair Ready · 0m Wait</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- SCENE 5: Live Queue & Smart Gap Monetizer -->
+        <!-- SCENE 5: Real Live Queue & Smart Gap Filler -->
         <div class="scene" id="scene-5">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/40 text-center">
-            <span class="text-4xl block mb-2">⚡✂️💺</span>
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 5 · Live Queue & Smart Gap Filler</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Manage live queue · Monetize empty 25-minute gaps</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Staff see active tokens in real time. When an appointment finishes early, TrimTime automatically alerts nearby walk-in customers to fill the chair.
-            </p>
-            <div class="bg-emerald-950/90 border border-emerald-500/40 p-4 rounded-xl text-left max-w-md mx-auto space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-white">Token #A01 · In Chair (Rahul)</span>
-                <span class="px-2 py-0.5 rounded bg-emerald-500 text-white font-extrabold text-[0.68rem]">Serving Now</span>
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/staff#queue</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 5 · Live Queue & Chair Gap OS</span>
+            </div>
+            <div class="p-4 sm:p-5 bg-[#0f2e24]">
+              <!-- Mock Top Navigation Tabs -->
+              <div class="grid grid-cols-4 gap-2 mb-3">
+                <div class="mock-nav-tab active"><span class="text-[0.62rem] text-emerald-300">2 active</span><span>Live queue</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">1 today</span><span>Appointments</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Desk</span><span>Generate token</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Staff OS</span><span>My account</span></div>
               </div>
-              <div class="p-2 rounded-lg bg-[#e2f752]/15 border border-[#e2f752]/40 text-xs flex items-center justify-between">
-                <span class="text-[#e2f752] font-bold">⚡ 25-min gap before next booking!</span>
-                <span class="text-white font-semibold text-[0.7rem] bg-[#091e19] px-2 py-0.5 rounded">Chair 100% Monetized</span>
+
+              <!-- Real Live Queue Item: Serving -->
+              <div class="space-y-2.5">
+                <div class="bg-white p-3 sm:p-4 rounded-xl border-2 border-emerald-500 shadow-md text-slate-800 text-left">
+                  <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                      <span class="text-base font-black font-mono bg-emerald-900 text-white px-2.5 py-0.5 rounded-lg">#A01</span>
+                      <span class="text-[0.65rem] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">● SERVING NOW</span>
+                    </div>
+                    <span class="text-xs font-black text-[#0f3d32]">₹400</span>
+                  </div>
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2">
+                    <div>
+                      <h4 class="font-extrabold text-sm text-slate-900">Suresh Mehta <span class="text-xs font-normal text-slate-500">· Classic Haircut + Beard</span></h4>
+                      <p class="text-[0.68rem] text-slate-500">Barber: <strong>Rahul Sharma</strong> · In chair 18 mins</p>
+                    </div>
+                    <button class="px-4 py-1.5 rounded-lg bg-emerald-600 text-white font-extrabold text-xs shadow-sm">
+                      Mark Done ✓
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Real Smart Gap Monetizer Alert -->
+                <div class="p-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border-2 border-[#e2f752] text-left text-white space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[0.68rem] font-black text-[#e2f752] uppercase tracking-wider flex items-center gap-1">
+                      <span>⚡</span> SMART CHAIR GAP MONETIZER
+                    </span>
+                    <span class="text-[0.65rem] bg-[#e2f752] text-[#091e19] font-black px-2 py-0.5 rounded">+₹150 Saved</span>
+                  </div>
+                  <p class="text-xs font-bold">25-minute gap detected before 11:30 AM appointment!</p>
+                  <p class="text-[0.7rem] text-emerald-200">Next walk-in (#A02 · Beard Trim · 15m) automatically invited to chair now.</p>
+                </div>
+
+                <!-- Next in Queue: Waiting -->
+                <div class="bg-white/95 p-3 rounded-xl border border-slate-200 shadow-sm text-slate-800 text-left flex items-center justify-between">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-black font-mono bg-slate-200 text-slate-800 px-2 py-0.5 rounded">#A02</span>
+                      <span class="text-[0.65rem] font-bold text-slate-500">Waiting (#1 in queue · ~4m wait)</span>
+                    </div>
+                    <p class="text-xs font-bold text-slate-900 mt-1">Arjun Verma · Beard Styling (₹150)</p>
+                  </div>
+                  <button class="px-3 py-1.5 rounded-lg bg-[#0f3d32] text-white font-extrabold text-[0.7rem]">
+                    Claim & Start ➔
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- SCENE 6: Customer Appointment Booking -->
+        <!-- SCENE 6: Real Customer Appointment Scheduling -->
         <div class="scene" id="scene-6">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-purple-500/30 text-center">
-            <span class="text-4xl block mb-2">📅⭐💇‍♂️</span>
-            <span class="text-xs font-bold text-purple-400 uppercase tracking-widest bg-purple-950/70 px-3 py-1 rounded-full border border-purple-800">Scene 6 · Customer Appointment Scheduling</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customers book future slots with preferred stylists</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              VIP customers choose date, time and their favorite barber directly on their mobile phone. Automatic SMS reminders ensure zero no-shows.
-            </p>
-            <div class="bg-black/60 border border-purple-500/30 p-4 rounded-xl text-left max-w-md mx-auto space-y-2 text-xs">
-              <div class="flex justify-between items-center">
-                <span class="text-purple-300 font-bold">TODAY'S APPOINTMENT</span>
-                <span class="text-white font-mono bg-purple-950 px-2 py-0.5 rounded">4:30 PM - 5:15 PM</span>
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/staff#appointments</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 6 · Appointment Bookings</span>
+            </div>
+            <div class="p-4 sm:p-5 bg-[#0f2e24]">
+              <!-- Mock Top Navigation Tabs -->
+              <div class="grid grid-cols-4 gap-2 mb-3">
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">1 active</span><span>Live queue</span></div>
+                <div class="mock-nav-tab active"><span class="text-[0.62rem] text-emerald-300">1 confirmed</span><span>Appointments</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Desk</span><span>Generate token</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Staff OS</span><span>My account</span></div>
               </div>
-              <p class="text-white font-bold">Customer: Rohan Verma · Stylist: Priya</p>
-              <p class="text-slate-400 text-[0.7rem]">Services: Hair Spa + Deep Conditioning (₹850) · Pre-paid</p>
+
+              <!-- Real Appointment Booking Card -->
+              <div class="mock-panel text-left space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-black uppercase tracking-wider text-[#0f3d32]">Confirmed VIP Bookings</span>
+                    <span class="text-[0.65rem] bg-purple-100 text-purple-800 font-extrabold px-2 py-0.5 rounded-full">Booked Online</span>
+                  </div>
+                  <span class="text-xs font-bold text-slate-500">Slot: Today, 11:30 AM</span>
+                </div>
+                <div class="p-3 rounded-xl bg-purple-50/60 border border-purple-200 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="text-base font-black font-mono bg-purple-900 text-white px-2.5 py-0.5 rounded-lg">#B01</span>
+                      <span class="font-extrabold text-sm text-purple-950">Ananya Roy</span>
+                    </div>
+                    <span class="font-extrabold text-[#0f3d32] text-sm">₹600</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-[0.72rem] text-slate-600">
+                    <div>Service: <strong>Luxury Hair Spa (45 mins)</strong></div>
+                    <div>Stylist: <strong>Priya Patel (Preferred)</strong></div>
+                  </div>
+                  <div class="flex items-center justify-between pt-2 border-t border-purple-200/60 text-[0.68rem]">
+                    <span class="text-purple-700 font-semibold">✓ Automated reminder SMS delivered</span>
+                    <button class="px-3 py-1 rounded bg-purple-800 text-white font-bold text-xs">Check In</button>
+                  </div>
+                </div>
+                <p class="text-[0.68rem] text-slate-500 text-center">Zero double-booking · Perfectly scheduled right after the 25-min gap haircut!</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- SCENE 7: Real-Time Revenue & Analytics -->
+        <!-- SCENE 7: Real Daily Revenue & Analytics Screen -->
         <div class="scene" id="scene-7">
-          <div class="max-w-2xl mx-auto bg-black/50 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
-            <span class="text-4xl block mb-2">📊💰📈</span>
-            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/70 px-3 py-1 rounded-full border border-emerald-800">Scene 7 · Revenue & Performance Analytics</span>
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Real-time daily earnings & barber performance</h2>
-            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
-              Owner tracks daily cash collections, UPI payments, stylist commissions, and peak rush hours with zero manual register calculation.
-            </p>
-            <div class="grid grid-cols-3 gap-2.5 max-w-md mx-auto text-left text-xs">
-              <div class="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span class="text-slate-400 text-[0.65rem] font-bold block">TODAY'S SALES</span>
-                <span class="text-base font-black text-emerald-400">₹14,350</span>
+          <div class="max-w-2xl mx-auto software-window">
+            <div class="mock-browser-bar">
+              <div class="mock-dots"><span class="mock-dot bg-red-500"></span><span class="mock-dot bg-amber-500"></span><span class="mock-dot bg-green-500"></span></div>
+              <div class="mock-url">https://trimtime.in/staff#analytics</div>
+              <span class="text-[0.65rem] text-emerald-400 font-bold ml-auto">Step 7 · Analytics & Revenue</span>
+            </div>
+            <div class="p-4 sm:p-5 bg-[#0f2e24]">
+              <!-- Mock Top Navigation Tabs -->
+              <div class="grid grid-cols-4 gap-2 mb-2">
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Queue</span><span>Live queue</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Slots</span><span>Appointments</span></div>
+                <div class="mock-nav-tab"><span class="text-[0.62rem] text-slate-400">Desk</span><span>Generate token</span></div>
+                <div class="mock-nav-tab active"><span class="text-[0.62rem] text-emerald-300">Staff OS</span><span>My account</span></div>
               </div>
-              <div class="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span class="text-slate-400 text-[0.65rem] font-bold block">SERVED CLIENTS</span>
-                <span class="text-base font-black text-white">42 Cuts</span>
+              <!-- Mock Sub Navigation with Analytics active -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1 mb-2">
+                <span class="mock-sub-tab">Services</span>
+                <span class="mock-sub-tab">Team & staff</span>
+                <span class="mock-sub-tab active">Analytics</span>
+                <span class="mock-sub-tab">Settings</span>
+                <span class="mock-sub-tab">Shop details & QR</span>
               </div>
-              <div class="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span class="text-slate-400 text-[0.65rem] font-bold block">LOST CLIENTS</span>
-                <span class="text-base font-black text-[#e2f752]">0 Bleed</span>
+
+              <!-- Real Analytics Mini-cards Grid -->
+              <div class="mock-panel space-y-2.5 text-left">
+                <div class="flex items-center justify-between pb-1 border-b border-slate-100">
+                  <h4 class="font-black text-xs text-[#0f3d32]">Today's Performance · 24 Nov 2026</h4>
+                  <span class="text-[0.65rem] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Real-time</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span class="text-[0.62rem] text-slate-500 font-bold block">REVENUE</span>
+                    <span class="text-base font-black text-emerald-700">₹18,450</span>
+                  </div>
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span class="text-[0.62rem] text-slate-500 font-bold block">SERVICES</span>
+                    <span class="text-base font-black text-slate-900">48 Done</span>
+                  </div>
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span class="text-[0.62rem] text-slate-500 font-bold block">APPOINTMENTS</span>
+                    <span class="text-base font-black text-purple-700">14 Booked</span>
+                  </div>
+                  <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span class="text-[0.62rem] text-slate-500 font-bold block">CHAIR UTILIZATION</span>
+                    <span class="text-base font-black text-emerald-600">96% Full</span>
+                  </div>
+                </div>
+
+                <!-- Stylist Performance List -->
+                <div class="p-2 rounded-xl bg-slate-50 border border-slate-200 space-y-1 text-xs">
+                  <span class="text-[0.65rem] font-extrabold text-slate-700 uppercase tracking-wider block">Staff Commissions & Ratings</span>
+                  <div class="flex justify-between items-center text-[0.72rem] py-0.5">
+                    <span><strong>Rahul Sharma (Master Stylist)</strong> · 28 cuts · ★ 4.9</span>
+                    <span class="font-extrabold text-[#0f3d32]">₹11,200</span>
+                  </div>
+                  <div class="flex justify-between items-center text-[0.72rem] py-0.5 border-t border-slate-200">
+                    <span><strong>Priya Patel (Senior Stylist)</strong> · 20 cuts · ★ 4.8</span>
+                    <span class="font-extrabold text-[#0f3d32]">₹7,250</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
