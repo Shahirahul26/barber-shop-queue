@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TrimTime · 60-Second Video Demo for Salon Owners</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cabinet+Grotesk:wght@800;900&display=swap');
+    
+    :root {
+      --primary: #0f3d32;
+      --primary-dark: #091e19;
+      --emerald: #10b981;
+      --accent: #e2f752;
+      --mint: #ecfdf5;
+      --paper: #faf8f5;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #061511;
+      color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, .font-heading {
+      font-family: 'Cabinet Grotesk', 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .video-viewport {
+      background: #0a251e;
+      border: 1px solid rgba(226, 247, 82, 0.25);
+      border-radius: 24px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(16, 185, 129, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .scene {
+      display: none;
+      animation: fadeIn 0.4s ease-in-out;
+    }
+
+    .scene.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .control-btn {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: all 0.2s ease;
+    }
+
+    .control-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(226, 247, 82, 0.5);
+    }
+
+    .step-pill.active {
+      background: #e2f752;
+      color: #091e19;
+      font-weight: 800;
+      border-color: #e2f752;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-[#e2f752] selection:text-[#091e19]">
+
+  <!-- Top Sticky Header -->
+  <header class="sticky top-0 z-50 bg-[#061511]/90 backdrop-blur-md border-b border-emerald-900/50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-[#e2f752] text-[#091e19] font-black flex items-center justify-center text-lg">T</div>
+        <span class="font-extrabold text-white text-base tracking-wide">TRIM<span class="text-[#e2f752]">TIME</span></span>
+      </a>
+      <span class="hidden sm:inline-block text-xs font-bold text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800">
+        Demo Video for Salon Owners
+      </span>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a href="/visiting-card" class="text-xs font-bold text-slate-300 hover:text-white transition flex items-center gap-1">
+        <span>←</span> Visiting Card
+      </a>
+      <a href="/presentation/pdf" download="TrimTime_Presentation.pdf" class="hidden md:flex px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition items-center gap-1.5 border border-white/15">
+        <span>📥</span> Download PDF Guide
+      </a>
+      <a href="https://wa.me/919876543210?text=Hi%20TrimTime,%20I%20watched%20the%20demo%20video%20and%20want%20to%20try%20the%20free%20weekend%20trial" target="_blank" class="px-4 py-1.5 rounded-xl bg-[#e2f752] hover:bg-[#d4e942] text-[#091e19] font-extrabold text-xs transition flex items-center gap-1.5 shadow-md">
+        <span>💬</span> Free Trial WhatsApp
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-8 sm:py-12">
+    
+    <!-- Title & Video Intro -->
+    <div class="text-center max-w-3xl mx-auto mb-8">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold uppercase tracking-wider mb-3">
+        <span>▶</span> 60-Second Video Demonstration
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight mb-3">
+        See how TrimTime keeps your <br class="hidden sm:inline" />
+        <span class="text-[#e2f752]">barber chairs 100% full.</span>
+      </h1>
+      <p class="text-slate-300 text-sm sm:text-base max-w-xl mx-auto">
+        Watch how a customer scans your QR code, tracks their turn on mobile, and how you monetize empty 25-minute gaps between appointments.
+      </p>
+    </div>
+
+    <!-- Video Player Viewport -->
+    <div class="video-viewport p-4 sm:p-6 mb-8">
+      
+      <!-- Video Frame Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 text-xs text-slate-400">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+          <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+          <span class="ml-2 font-mono font-bold text-white text-[0.7rem] uppercase">TrimTime Interactive Demo Player · HD 1080p</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="video-timestamp" class="font-mono text-emerald-400 font-bold">0:00 / 1:20</span>
+          <button id="sound-btn" onclick="toggleSound()" class="control-btn px-2 py-1 rounded text-[0.7rem] flex items-center gap-1 text-white">
+            <span id="sound-icon">🔊</span> Sound On
+          </button>
+        </div>
+      </div>
+
+      <!-- Real Video Support: If demo.mp4 exists, play real file; else show animated simulation -->
+      <video id="custom-video" class="w-full rounded-2xl hidden mb-4" controls poster="/static/demo_poster.jpg">
+        <source src="/static/demo.mp4" type="video/mp4" />
+      </video>
+
+      <!-- Interactive Scene Simulator -->
+      <div id="simulation-screen" class="py-6 sm:py-10 min-h-[380px] sm:min-h-[440px] flex flex-col justify-center">
+        
+        <!-- SCENE 1: The Problem (Lost Walk-ins) -->
+        <div class="scene active" id="scene-1">
+          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-red-500/30 text-center">
+            <span class="text-4xl block mb-3">🚪🚶‍♂️💨</span>
+            <span class="text-xs font-bold text-red-400 uppercase tracking-widest bg-red-950/60 px-3 py-1 rounded-full border border-red-800">Scene 1: The Weekend Bleed</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer peeks in, sees 4 on sofa, and walks away!</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              "Bhaiya bahut bheed hai, shaam ko dekhte hain." The customer walks to the salon across the street. You just lost ₹350 cash in 5 seconds.
+            </p>
+            <div class="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-red-300 font-bold text-xs inline-flex items-center gap-2">
+              <span>✕</span> Lost Revenue: ₹350 per walk-away · 5 customers/day = ₹1,750 lost daily!
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 2: Customer Scans QR Code -->
+        <div class="scene" id="scene-2">
+          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-emerald-500/30 text-center">
+            <span class="text-4xl block mb-3">📷📱✨</span>
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800">Scene 2: Scan & Freedom to Roam</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer scans your Counter QR standee</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Opens instantly in mobile browser without downloading any app! Customer selects <strong>Haircut + Beard Trim (₹350)</strong>.
+            </p>
+            <div class="bg-emerald-950/80 border border-emerald-500/40 p-4 rounded-xl text-left max-w-md mx-auto space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-emerald-300 font-bold">LIVE TOKEN ISSUED:</span>
+                <span class="text-lg font-black text-[#e2f752] bg-emerald-900 px-3 py-0.5 rounded-lg">#A04</span>
+              </div>
+              <p class="text-xs text-white">Position: <strong>2 people ahead</strong> · Estimated Wait: <strong>~18 mins</strong></p>
+              <p class="text-[0.7rem] text-emerald-300">Customer walks to nearby cafe to grab chai, knowing their turn is safe!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 3: Smart Gap Monetizer -->
+        <div class="scene" id="scene-3">
+          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-[#e2f752]/40 text-center">
+            <span class="text-4xl block mb-3">⚡✂️💰</span>
+            <span class="text-xs font-bold text-[#e2f752] uppercase tracking-widest bg-[#e2f752]/10 px-3 py-1 rounded-full border border-[#e2f752]/30">Scene 3: Monetizing the 25-Min Gap</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Current cut ends 10:30 · Next booking 11:00</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Normally, your chair sits empty for 30 minutes earning ₹0. TrimTime automatically spots this 25-min gap!
+            </p>
+            <div class="bg-gradient-to-r from-emerald-900/80 to-[#0f3d32] border border-[#e2f752] p-4 rounded-xl text-left max-w-md mx-auto">
+              <span class="text-[0.65rem] font-extrabold text-[#e2f752] uppercase tracking-wider block mb-1">AUTOMATIC BARBER ALERT</span>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm font-bold text-white">Token #A04 (Classic Haircut · 20 min)</p>
+                  <span class="text-[0.7rem] text-emerald-200">Customer is outside nearby</span>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-[#e2f752] text-[#091e19] font-black text-xs">
+                  ⚡ Fits open chair gap!
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCENE 4: Chair Start & Completed -->
+        <div class="scene" id="scene-4">
+          <div class="max-w-2xl mx-auto bg-black/40 backdrop-blur-md p-6 sm:p-8 rounded-2xl border border-blue-500/30 text-center">
+            <span class="text-4xl block mb-3">💈⭐💵</span>
+            <span class="text-xs font-bold text-blue-400 uppercase tracking-widest bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800">Scene 4: 1-Tap 'Start' & 'Mark Done'</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-3 mb-2">Customer enters chair. Zero delay.</h2>
+            <p class="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed mb-4">
+              Barber taps <strong>[Start]</strong> on tablet. Customer mobile turns green ("In Chair!"). Barber finishes cut at 10:55 AM, taps <strong>[Mark Done]</strong>.
+            </p>
+            <div class="grid grid-cols-2 gap-3 max-w-md mx-auto text-left">
+              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
+                <span class="text-xs text-slate-400 block font-bold">Barber Profit</span>
+                <span class="text-base font-black text-emerald-400">+₹350 Earned in Empty Gap</span>
+              </div>
+              <div class="bg-white/10 p-3 rounded-xl border border-white/10">
+                <span class="text-xs text-slate-400 block font-bold">Customer Review</span>
+                <span class="text-base font-black text-[#e2f752]">★★★★★ 5-Star Rating</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Video Progress & Controls Bar -->
+      <div class="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        
+        <!-- Scene Selector Pills -->
+        <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0" id="scene-pills">
+          <button onclick="goToScene(1)" class="step-pill active px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap">
+            1. The Problem
+          </button>
+          <button onclick="goToScene(2)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
+            2. Scan QR
+          </button>
+          <button onclick="goToScene(3)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
+            3. Smart Gap
+          </button>
+          <button onclick="goToScene(4)" class="step-pill px-3 py-1.5 rounded-lg text-xs font-bold border border-white/15 whitespace-nowrap text-slate-300">
+            4. In Chair & Done
+          </button>
+        </div>
+
+        <!-- Playback Actions -->
+        <div class="flex items-center gap-2">
+          <button id="play-pause-btn" onclick="togglePlay()" class="px-4 py-1.5 rounded-xl bg-[#e2f752] text-[#091e19] font-black text-xs transition hover:bg-[#d4e942] flex items-center gap-1.5 shadow-sm">
+            <span id="play-icon">⏸</span> Pause Demo
+          </button>
+          <button onclick="restartDemo()" class="control-btn px-3 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1">
+            <span>↺</span> Restart
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 3 Simple Barber Steps (Hindi & English) -->
+    <div class="bg-gradient-to-b from-[#0a251e] to-[#061511] border border-white/10 rounded-3xl p-6 sm:p-10 mb-10">
+      <div class="text-center max-w-2xl mx-auto mb-8">
+        <span class="text-xs font-bold text-emerald-400 uppercase tracking-widest">Aasaan Tareeka · No Training Needed</span>
+        <h2 class="text-2xl sm:text-4xl font-extrabold text-white mt-1">Barber ke liye 3 simple steps</h2>
+        <p class="text-slate-400 text-xs sm:text-sm mt-1">Kisi computer ki zaroorat nahi. Tablet ya phone par 1-tap operation.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white/5 p-6 rounded-2xl border border-white/10">
+          <div class="w-10 h-10 rounded-xl bg-[#e2f752] text-[#091e19] font-black flex items-center justify-center text-lg mb-3">1</div>
+          <h3 class="text-lg font-bold text-white mb-1">Customer QR Scan Karta Hai</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">Shop ke door ya counter par QR code hota hai. Customer scan karta hai, service choose karta hai aur ticket number mil jaata hai.</p>
+        </div>
+        <div class="bg-white/5 p-6 rounded-2xl border border-white/10">
+          <div class="w-10 h-10 rounded-xl bg-emerald-400 text-[#091e19] font-black flex items-center justify-center text-lg mb-3">2</div>
+          <h3 class="text-lg font-bold text-white mb-1">Khali Chair Turant Fill Hoti Hai</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">Do appointments ke beech 20-30 min gap ho to software short services (Beard trim/haircut) ko priority par suggest karta hai.</p>
+        </div>
+        <div class="bg-white/5 p-6 rounded-2xl border border-white/10">
+          <div class="w-10 h-10 rounded-xl bg-blue-400 text-[#091e19] font-black flex items-center justify-center text-lg mb-3">3</div>
+          <h3 class="text-lg font-bold text-white mb-1">Bas 'Start' aur 'Done' Dabao</h3>
+          <p class="text-xs text-slate-300 leading-relaxed">Cut start hone par ek button 'Start' dabana hai, complete hone par 'Mark Done'. Rating aur digital bill customer ke phone par chala jata hai.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Call to Action Banner -->
+    <div class="bg-gradient-to-r from-[#0f3d32] to-[#165b4c] border border-emerald-500/40 p-8 rounded-3xl text-center text-white relative overflow-hidden">
+      <div class="max-w-xl mx-auto">
+        <span class="inline-block bg-[#e2f752] text-[#091e19] font-extrabold text-[0.7rem] px-3 py-1 rounded-full uppercase tracking-wider mb-3">
+          Zero-Risk 7-Day Weekend Trial
+        </span>
+        <h2 class="text-3xl sm:text-4xl font-extrabold mb-3">Aapki shop ko banayein smart salon!</h2>
+        <p class="text-emerald-100 text-xs sm:text-sm mb-6 leading-relaxed">
+          Hum aapki shop ka custom acrylic QR standee aur staff login 24 ghante me deliver karte hain bilkul FREE. Weekend me test karein — 5 customer bhi bachenge to software khud pay ho jayega!
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a href="https://wa.me/919876543210?text=Hi%20TrimTime,%20I%20want%20to%20set%20up%20the%20free%207-day%20salon%20pilot" target="_blank" class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[#e2f752] hover:bg-[#d4e942] text-[#091e19] font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+            <span>💬</span> WhatsApp for Free Setup (+91 98765 43210)
+          </a>
+          <a href="/customer" class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20 transition flex items-center justify-center gap-2">
+            <span>💈</span> Open Customer Live Queue Sandbox
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let currentScene = 1;
+    const totalScenes = 4;
+    let isPlaying = true;
+    let timer = null;
+    let soundEnabled = true;
+
+    // Optional audio synth ding for realistic demo feel
+    function playDing() {
+      if (!soundEnabled) return;
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch(e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('sound-btn').innerHTML = `<span id="sound-icon">${soundEnabled ? '🔊' : '🔇'}</span> Sound ${soundEnabled ? 'On' : 'Off'}`;
+    }
+
+    function showScene(n) {
+      currentScene = n;
+      document.querySelectorAll('.scene').forEach((sc, idx) => {
+        sc.classList.toggle('active', idx + 1 === n);
+      });
+      document.querySelectorAll('.step-pill').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === n);
+        btn.classList.toggle('text-slate-300', idx + 1 !== n);
+      });
+      
+      const timestamps = ["0:15 / 1:20", "0:35 / 1:20", "0:55 / 1:20", "1:15 / 1:20"];
+      document.getElementById('video-timestamp').textContent = timestamps[n - 1] || "0:00 / 1:20";
+      playDing();
+    }
+
+    function nextScene() {
+      if (currentScene < totalScenes) {
+        showScene(currentScene + 1);
+      } else {
+        showScene(1);
+      }
+    }
+
+    function startAutoPlay() {
+      clearInterval(timer);
+      timer = setInterval(() => {
+        if (isPlaying) {
+          nextScene();
+        }
+      }, 5000); // 5 seconds per scene
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('play-icon').textContent = isPlaying ? '⏸' : '▶';
+      document.getElementById('play-pause-btn').innerHTML = `<span id="play-icon">${isPlaying ? '⏸' : '▶'}</span> ${isPlaying ? 'Pause Demo' : 'Play Demo'}`;
+    }
+
+    function goToScene(n) {
+      showScene(n);
+      startAutoPlay();
+    }
+
+    function restartDemo() {
+      showScene(1);
+      isPlaying = true;
+      document.getElementById('play-pause-btn').innerHTML = `<span id="play-icon">⏸</span> Pause Demo`;
+      startAutoPlay();
+    }
+
+    startAutoPlay();
+  </script>
+</body>
+</html>

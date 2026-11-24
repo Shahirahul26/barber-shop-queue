@@ -463,7 +463,7 @@ def build_visiting_card_pdf(output_path: Path):
             Paragraph("<b>FOR SALONS:</b><br/>• Zero walk-away losses<br/>• Fills 20-min empty gaps<br/>• +₹30k–₹60k monthly profit", b_bullet),
             Paragraph("<b>FOR CUSTOMERS:</b><br/>• Live mobile wait clock<br/>• Zero sofa waiting<br/>• 1-tap 6-digit MPIN login", b_bullet)
         ],
-        [Paragraph("<b>Scan QR for Live Demo:</b><br/>app.trimtime.in/demo", b_bullet), Paragraph("<b>Book Free Pilot:</b><br/>+91 98765 43210", b_cta)]
+        [Paragraph("<b>▶ Scan for Video Demo:</b><br/>trimtime.in/demo", b_bullet), Paragraph("<b>Book Free Pilot:</b><br/>+91 98765 43210", b_cta)]
     ]
     t_b = Table(b_data, colWidths=[116, 116])
     t_b.setStyle(TableStyle([

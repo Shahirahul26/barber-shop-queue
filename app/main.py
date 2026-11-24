@@ -440,6 +440,11 @@ def visiting_card_page():
     return FileResponse(STATIC_DIR / "visiting-card.html")
 
 
+@app.get("/demo", include_in_schema=False)
+def demo_page():
+    return FileResponse(STATIC_DIR / "demo.html")
+
+
 @app.get("/presentation/pdf", include_in_schema=False)
 def presentation_pdf():
     return FileResponse(STATIC_DIR / "TrimTime_Presentation.pdf", filename="TrimTime_Presentation.pdf", media_type="application/pdf")

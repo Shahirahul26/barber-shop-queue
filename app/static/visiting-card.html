@@ -246,21 +246,24 @@
 
         <!-- Bottom Back: QR Code & CTA -->
         <div class="flex items-center justify-between border-t border-gray-200 pt-2.5">
-          <div class="flex items-center gap-3">
-            <div class="w-14 h-14 bg-white p-1 rounded-lg border-2 border-[#0f3d32] flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 24 24" class="w-full h-full text-[#0f3d32]" fill="currentColor">
-                <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm10-2h8v8h-8V2zm2 2v4h4V4h-4zM2 14h8v8H2v-8zm2 2v4h4v-4H4zm14 0h4v2h-4v-2zm-4 0h2v4h-2v-4zm2 4h4v2h-4v-2zm-2-4v-2h4v2h-4zm2-6h2v2h-2V8zm-6 2h2v2h-2v-2zm2 2h2v2h-2v-2zm-4 4h2v2h-2v-2zm0-6h2v2h-2V8zm2 2h2v2h-2v-2z"/>
-              </svg>
+          <a href="/demo" class="flex items-center gap-3 group text-left" onclick="event.stopPropagation()">
+            <div class="w-14 h-14 bg-white p-0.5 rounded-lg border-2 border-[#0f3d32] flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition">
+              <img src="/static/demo_qr.png" alt="Scan for Video Demo" class="w-full h-full object-contain" />
             </div>
             <div>
-              <p class="text-[0.68rem] font-black text-gray-900 leading-tight">Scan for Live Demo</p>
-              <p class="text-[0.6rem] text-slate-500">Test the queue right on your phone</p>
-              <p class="text-[0.6rem] font-bold text-emerald-700 mt-0.5">app.trimtime.in/demo</p>
+              <p class="text-[0.68rem] font-black text-gray-900 leading-tight group-hover:text-emerald-700 transition flex items-center gap-1">
+                <span>▶</span> Scan for Video Demo
+              </p>
+              <p class="text-[0.6rem] text-slate-500">Watch 60-sec demo video</p>
+              <p class="text-[0.6rem] font-bold text-emerald-700 mt-0.5">trimtime.in/demo</p>
             </div>
-          </div>
+          </a>
 
-          <div class="text-right">
-            <a href="/visiting-card/pdf" download="TrimTime_Visiting_Card.pdf" class="inline-block bg-[#0f3d32] hover:bg-[#165b4c] text-white text-[0.65rem] font-extrabold px-3 py-1.5 rounded-lg shadow-sm">
+          <div class="text-right flex flex-col items-end gap-1.5">
+            <a href="/demo" onclick="event.stopPropagation()" class="inline-block bg-[#0f3d32] hover:bg-[#165b4c] text-white text-[0.65rem] font-extrabold px-3 py-1.5 rounded-lg shadow-sm transition">
+              Watch Demo Video ▶
+            </a>
+            <a href="/visiting-card/pdf" download="TrimTime_Visiting_Card.pdf" onclick="event.stopPropagation()" class="text-[0.6rem] font-bold text-emerald-800 hover:underline">
               Save Card PDF ↓
             </a>
           </div>
@@ -276,8 +279,30 @@
   </div>
 
   <script>
+    const card = document.getElementById('card');
+    const container = document.querySelector('.card-perspective');
+    let isFlipped = false;
+
     function flipCard() {
-      document.getElementById('card').classList.toggle('flipped');
+      isFlipped = !isFlipped;
+      card.classList.toggle('flipped', isFlipped);
+    }
+
+    // 3D Parallax Tilt Effect on Mouse Move
+    if (container && window.matchMedia('(hover: hover)').matches) {
+      container.addEventListener('mousemove', (e) => {
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - rect.left - rect.width / 2;
+        const y = e.clientY - rect.top - rect.height / 2;
+        const tiltX = (y / (rect.height / 2)) * -12;
+        const tiltY = (x / (rect.width / 2)) * 12;
+        const baseRotY = isFlipped ? 180 : 0;
+        card.style.transform = `rotateX(${tiltX}deg) rotateY(${baseRotY + tiltY}deg)`;
+      });
+
+      container.addEventListener('mouseleave', () => {
+        card.style.transform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
+      });
     }
   </script>
 </body>
