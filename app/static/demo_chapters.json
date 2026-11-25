@@ -1,0 +1,57 @@
+[
+  {
+    "id": "register",
+    "title": "1. Register Shop & GPS",
+    "start": 0.0
+  },
+  {
+    "id": "approval_login",
+    "title": "2. Admin Approval & Login",
+    "start": 32.17
+  },
+  {
+    "id": "services",
+    "title": "3. Services (Add, Edit, Delete)",
+    "start": 52.58
+  },
+  {
+    "id": "team",
+    "title": "4. Team, Availability, Leave & Invite",
+    "start": 76.41
+  },
+  {
+    "id": "walkin",
+    "title": "5. Walk-In Token (Multi-Service)",
+    "start": 104.36
+  },
+  {
+    "id": "queue",
+    "title": "6. Live Queue (Start, Done, Pause, Skip)",
+    "start": 125.59
+  },
+  {
+    "id": "appointments",
+    "title": "7. Appointments",
+    "start": 146.38
+  },
+  {
+    "id": "analytics",
+    "title": "8. Analytics & Transparency",
+    "start": 157.67
+  },
+  {
+    "id": "settings",
+    "title": "9. Settings (MPIN, Password & Link)",
+    "start": 177.55
+  },
+  {
+    "id": "shop_qr",
+    "title": "10. Shop Details, Photo & Wall QR",
+    "start": 191.91
+  },
+  {
+    "id": "logout",
+    "title": "11. Logout",
+    "start": 210.64
+  }
+]
